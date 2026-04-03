@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/api/ai-insight", "destination": "/api/ai-insight" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
