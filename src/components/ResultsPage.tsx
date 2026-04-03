@@ -5,9 +5,10 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
 } from 'recharts';
-import { RotateCcw, TrendingUp, Shield, DollarSign, BarChart3 } from 'lucide-react';
+import { RotateCcw, TrendingUp, DollarSign, BarChart3, Layers } from 'lucide-react';
 import { fundMap, assetClassColors } from '../data/funds';
 import type { ScoringResult } from '../engine/scoringEngine';
+import type { DimensionScores } from '../data/portfolios';
 
 const COLORS = ['#00A651', '#1A73E8', '#6B7280', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#EF4444'];
 
@@ -15,29 +16,22 @@ function formatCOP(value: number): string {
   return '$' + value.toLocaleString('es-CO');
 }
 
-function RiskMeter({ level }: { level: number }) {
-  const segments = Array.from({ length: 10 }, (_, i) => i + 1);
-  return (
-    <div className="flex items-center gap-1">
-      {segments.map((seg) => (
-        <div
-          key={seg}
-          className={`h-8 flex-1 rounded-sm transition-colors ${
-            seg <= level
-              ? seg <= 3
-                ? 'bg-green-400'
-                : seg <= 6
-                ? 'bg-yellow-400'
-                : seg <= 8
-                ? 'bg-orange-400'
-                : 'bg-red-400'
-              : 'bg-gray-200'
-          }`}
-        />
-      ))}
-    </div>
-  );
+function getRiskBadge(level: number): { label: string; className: string } {
+  if (level <= 2) return { label: 'Conservador', className: 'bg-green-100 text-green-700' };
+  if (level <= 4) return { label: 'Moderado-Bajo', className: 'bg-teal-100 text-teal-700' };
+  if (level <= 6) return { label: 'Moderado', className: 'bg-blue-100 text-blue-700' };
+  if (level <= 8) return { label: 'Moderado-Alto', className: 'bg-amber-100 text-amber-700' };
+  return { label: 'Agresivo', className: 'bg-red-100 text-red-700' };
 }
+
+const keyDimensionConfig: { key: keyof DimensionScores; label: string; max: number }[] = [
+  { key: 'riskTolerance', label: 'Tolerancia al Riesgo', max: 10 },
+  { key: 'timeHorizon', label: 'Horizonte Temporal', max: 10 },
+  { key: 'volatilityComfort', label: 'Comodidad con Volatilidad', max: 5 },
+  { key: 'liquidityNeed', label: 'Necesidad de Liquidez', max: 5 },
+  { key: 'investmentSophistication', label: 'Sofisticación', max: 5 },
+  { key: 'esgPreference', label: 'Preferencia ESG', max: 3 },
+];
 
 export default function ResultsPage({
   result,
@@ -48,19 +42,16 @@ export default function ResultsPage({
 }) {
   const { portfolio, finalScores, allocations } = result;
 
-  // Pie chart data
   const pieData = useMemo(
     () =>
       allocations.map((a, i) => ({
         name: a.ticker,
-        fullName: fundMap[a.ticker]?.name || a.ticker,
         value: a.weight,
         color: COLORS[i % COLORS.length],
       })),
     [allocations]
   );
 
-  // Weighted expense ratio
   const weightedER = useMemo(
     () =>
       allocations.reduce((sum, a) => {
@@ -70,9 +61,8 @@ export default function ResultsPage({
     [allocations]
   );
 
-  // Projection data
   const projectionData = useMemo(() => {
-    const initial = 50_000_000; // $50M COP
+    const initial = 50_000_000;
     const years = [0, 1, 2, 3, 5, 7, 10, 15, 20];
     return years.map((y) => ({
       year: y,
@@ -83,12 +73,11 @@ export default function ResultsPage({
     }));
   }, [portfolio]);
 
-  // Radar data
   const radarData = useMemo(() => {
     const labels: Record<string, string> = {
-      riskTolerance: 'Tolerancia al Riesgo',
+      riskTolerance: 'Riesgo',
       timeHorizon: 'Horizonte',
-      incomeNeed: 'Necesidad de Renta',
+      incomeNeed: 'Renta',
       esgPreference: 'ESG',
       internationalInterest: 'Internacional',
       liquidityNeed: 'Liquidez',
@@ -102,6 +91,8 @@ export default function ResultsPage({
     }));
   }, [finalScores]);
 
+  const riskBadge = getRiskBadge(portfolio.riskLevel);
+
   return (
     <section id="prototype" className="section-padding">
       <div className="container-max">
@@ -110,7 +101,7 @@ export default function ResultsPage({
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-12"
+          className="text-center mb-10"
         >
           <h2 className="font-display text-3xl sm:text-4xl font-bold text-gray-900 mb-3">
             Su Portafolio Recomendado
@@ -118,100 +109,94 @@ export default function ResultsPage({
           <p className="text-co-muted">Basado en sus respuestas y perfil de inversionista</p>
         </motion.div>
 
-        {/* Portfolio Header */}
+        {/* 1. PORTFOLIO HERO CARD */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="card p-8 mb-8"
+          className="mb-8"
         >
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <div>
-              <h3 className="font-display text-2xl font-bold text-gray-900">{portfolio.name}</h3>
-              <p className="text-sm text-co-muted mt-1 max-w-xl">{portfolio.description}</p>
+          <div className="rounded-2xl bg-gradient-to-br from-gray-900 via-gray-850 to-gray-800 p-8 lg:p-10 shadow-xl">
+            {/* Badges */}
+            <div className="flex flex-wrap items-center gap-2 mb-5">
+              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${riskBadge.className}`}>
+                {riskBadge.label} · Nivel {portfolio.riskLevel}/10
+              </span>
+              {result.selectedThemes.length > 0 && (
+                <span className="px-3 py-1 rounded-full text-xs font-medium bg-white/10 text-white/70">
+                  {result.selectedThemes.length} tema{result.selectedThemes.length > 1 ? 's' : ''} personalizado{result.selectedThemes.length > 1 ? 's' : ''}
+                </span>
+              )}
             </div>
-            <div className="flex items-center gap-4">
-              <div className="text-center">
-                <p className="text-xs text-co-muted uppercase tracking-wider mb-1">Retorno Esperado</p>
-                <p className="text-xl font-bold text-co-green">{portfolio.expectedReturnMid}% <span className="text-sm font-normal text-co-muted">anual</span></p>
-              </div>
-            </div>
-          </div>
 
-          {/* Risk Meter */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">Nivel de Riesgo</span>
-              <span className="text-sm font-bold text-gray-900">{portfolio.riskLevel}/10</span>
-            </div>
-            <RiskMeter level={portfolio.riskLevel} />
-            <div className="flex justify-between mt-1">
-              <span className="text-xs text-co-muted">Conservador</span>
-              <span className="text-xs text-co-muted">Agresivo</span>
-            </div>
-          </div>
+            <h3 className="font-display text-2xl sm:text-3xl font-bold text-white mb-3">
+              {portfolio.name}
+            </h3>
+            <p className="text-white/60 text-sm leading-relaxed mb-8 max-w-2xl">
+              {portfolio.description}
+            </p>
 
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-100">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-green-50 flex items-center justify-center">
-                <TrendingUp className="w-4 h-4 text-co-green" />
+            {/* Key metrics */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 pt-6 border-t border-white/10">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <TrendingUp className="w-3.5 h-3.5 text-co-green" />
+                  <p className="text-white/50 text-xs uppercase tracking-wider">Retorno Base</p>
+                </div>
+                <p className="text-2xl font-bold text-white">{portfolio.expectedReturnMid}%</p>
+                <p className="text-white/40 text-xs mt-0.5">anual estimado</p>
               </div>
               <div>
-                <p className="text-xs text-co-muted">Retorno Rango</p>
-                <p className="text-sm font-semibold">{portfolio.expectedReturnLow}% – {portfolio.expectedReturnHigh}%</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
-                <DollarSign className="w-4 h-4 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-xs text-co-muted">Costo Ponderado</p>
-                <p className="text-sm font-semibold">{(weightedER * 100).toFixed(2)}%</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-purple-50 flex items-center justify-center">
-                <BarChart3 className="w-4 h-4 text-purple-600" />
+                <div className="flex items-center gap-2 mb-1">
+                  <BarChart3 className="w-3.5 h-3.5 text-blue-400" />
+                  <p className="text-white/50 text-xs uppercase tracking-wider">Rango</p>
+                </div>
+                <p className="text-2xl font-bold text-white">{portfolio.expectedReturnLow}–{portfolio.expectedReturnHigh}%</p>
+                <p className="text-white/40 text-xs mt-0.5">escenario conservador–optimista</p>
               </div>
               <div>
-                <p className="text-xs text-co-muted">ETFs en Portafolio</p>
-                <p className="text-sm font-semibold">{allocations.length}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-yellow-50 flex items-center justify-center">
-                <Shield className="w-4 h-4 text-yellow-600" />
+                <div className="flex items-center gap-2 mb-1">
+                  <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+                  <p className="text-white/50 text-xs uppercase tracking-wider">Costo TER</p>
+                </div>
+                <p className="text-2xl font-bold text-white">{(weightedER * 100).toFixed(2)}%</p>
+                <p className="text-white/40 text-xs mt-0.5">costo ponderado anual</p>
               </div>
               <div>
-                <p className="text-xs text-co-muted">Temas Aplicados</p>
-                <p className="text-sm font-semibold">{result.selectedThemes.length || 'Ninguno'}</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <Layers className="w-3.5 h-3.5 text-purple-400" />
+                  <p className="text-white/50 text-xs uppercase tracking-wider">ETFs</p>
+                </div>
+                <p className="text-2xl font-bold text-white">{allocations.length}</p>
+                <p className="text-white/40 text-xs mt-0.5">instrumentos iShares</p>
               </div>
             </div>
           </div>
         </motion.div>
 
+        {/* 2. FUND ALLOCATION: Pie + Fund List */}
         <div className="grid lg:grid-cols-2 gap-8 mb-8">
           {/* Pie Chart */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.15 }}
             className="card p-8"
           >
-            <h4 className="font-display text-lg font-bold text-gray-900 mb-6">Distribución del Portafolio</h4>
-            <div className="h-72">
+            <h4 className="font-display text-lg font-bold text-gray-900 mb-6">
+              Distribución del Portafolio
+            </h4>
+            <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={pieData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
+                    innerRadius={55}
+                    outerRadius={95}
                     dataKey="value"
                     stroke="none"
                   >
@@ -226,7 +211,7 @@ export default function ResultsPage({
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex flex-wrap gap-3 justify-center mt-2">
+            <div className="flex flex-wrap gap-2.5 justify-center mt-3">
               {pieData.map((d) => (
                 <div key={d.name} className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }} />
@@ -236,15 +221,67 @@ export default function ResultsPage({
             </div>
           </motion.div>
 
+          {/* Fund Detail List */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="card p-8"
+          >
+            <h4 className="font-display text-lg font-bold text-gray-900 mb-6">
+              Composición Detallada
+            </h4>
+            <div className="space-y-3">
+              {allocations.map((a, i) => {
+                const fund = fundMap[a.ticker];
+                if (!fund) return null;
+                const color = assetClassColors[fund.assetClass] || '#6B7280';
+                return (
+                  <div key={a.ticker} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-1.5 h-8 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                      />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="text-xs font-bold px-1.5 py-0.5 rounded"
+                            style={{ backgroundColor: color + '15', color }}
+                          >
+                            {a.ticker}
+                          </span>
+                        </div>
+                        <p className="text-xs text-co-muted mt-0.5 leading-tight max-w-[180px] truncate">
+                          {fund.name}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0 ml-2">
+                      <p className="text-lg font-bold text-gray-900">{a.weight}%</p>
+                      <p className="text-xs text-co-muted">TER {fund.expenseRatio}%</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        </div>
+
+        {/* 3. INVESTOR PROFILE: Radar + Dimension Scores */}
+        <div className="grid lg:grid-cols-2 gap-8 mb-8">
           {/* Radar Chart */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.3 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.2 }}
             className="card p-8"
           >
-            <h4 className="font-display text-lg font-bold text-gray-900 mb-6">Perfil del Inversionista</h4>
+            <h4 className="font-display text-lg font-bold text-gray-900 mb-6">
+              Perfil del Inversionista
+            </h4>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="70%">
@@ -262,17 +299,53 @@ export default function ResultsPage({
               </ResponsiveContainer>
             </div>
           </motion.div>
+
+          {/* Key Dimension Scores */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.25 }}
+            className="card p-8"
+          >
+            <h4 className="font-display text-lg font-bold text-gray-900 mb-6">
+              Sus Dimensiones Clave
+            </h4>
+            <div className="space-y-5">
+              {keyDimensionConfig.map(({ key, label, max }) => {
+                const raw = (finalScores as unknown as Record<string, number>)[key] || 0;
+                const pct = Math.min(100, (raw / max) * 100);
+                const rounded = Math.round(raw * 10) / 10;
+                return (
+                  <div key={key}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-medium text-gray-700">{label}</span>
+                      <span className="text-xs font-bold text-gray-900">{rounded} / {max}</span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-co-green rounded-full transition-all duration-700"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
         </div>
 
-        {/* Projection Chart */}
+        {/* 4. GROWTH PROJECTION */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.35 }}
-          className="card p-8 mb-8"
+          transition={{ duration: 0.6, delay: 0.3 }}
+          className="card p-8 mb-10"
         >
-          <h4 className="font-display text-lg font-bold text-gray-900 mb-2">Proyección de Crecimiento</h4>
+          <h4 className="font-display text-lg font-bold text-gray-900 mb-1">
+            Proyección de Crecimiento
+          </h4>
           <p className="text-xs text-co-muted mb-6">
             Inversión inicial de {formatCOP(50_000_000)} COP — Escenarios conservador, base y optimista
           </p>
@@ -286,7 +359,7 @@ export default function ResultsPage({
                   tickFormatter={(val: number) => `$${(val / 1_000_000).toFixed(0)}M`}
                 />
                 <Tooltip
-                  formatter={(value: number) => formatCOP(value)}
+                  formatter={(value: number) => [formatCOP(value)]}
                   contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 12 }}
                 />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
@@ -298,48 +371,16 @@ export default function ResultsPage({
           </div>
         </motion.div>
 
-        {/* Fund Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-        >
-          <h4 className="font-display text-lg font-bold text-gray-900 mb-6">Composición Detallada</h4>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-            {allocations.map((a) => {
-              const fund = fundMap[a.ticker];
-              if (!fund) return null;
-              const color = assetClassColors[fund.assetClass];
-              return (
-                <div key={a.ticker} className="card p-5">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <span
-                        className="inline-block text-xs font-bold px-2 py-0.5 rounded"
-                        style={{ backgroundColor: color + '15', color }}
-                      >
-                        {a.ticker}
-                      </span>
-                      <p className="text-sm font-semibold text-gray-900 mt-2 leading-snug">{fund.name}</p>
-                    </div>
-                    <span className="text-2xl font-bold text-gray-900">{a.weight}%</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-co-muted">
-                    <span>{fund.category}</span>
-                    <span>TER: {fund.expenseRatio}%</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </motion.div>
-
-        {/* Restart */}
-        <div className="text-center mt-12">
+        {/* 5. FOOTER */}
+        <div className="text-center">
+          <p className="text-xs text-co-muted max-w-xl mx-auto mb-6 leading-relaxed">
+            Las proyecciones son ilustrativas y no garantizan rendimientos futuros. Este prototipo es
+            exclusivamente para demostración interna y no constituye asesoría financiera ni oferta de
+            productos de inversión.
+          </p>
           <button onClick={onRestart} className="btn-outline gap-2">
             <RotateCcw className="w-4 h-4" />
-            Reiniciar
+            Reiniciar cuestionario
           </button>
         </div>
       </div>

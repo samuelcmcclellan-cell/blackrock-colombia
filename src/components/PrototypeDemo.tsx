@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, createElement } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, ChevronRight, ChevronLeft, SkipForward, Sparkles, Loader2, MessageSquare } from 'lucide-react';
+import { Check, ChevronRight, ChevronLeft, SkipForward, Sparkles, Loader2 } from 'lucide-react';
 import { questionnaireSteps, type StepId, type Question } from '../data/questions';
 import { useAIInsight } from '../hooks/useAIInsight';
 import { runScoringEngine, type Answers, type ScoringResult } from '../engine/scoringEngine';
@@ -47,7 +47,7 @@ export default function PrototypeDemo() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [allAnswers, setAllAnswers] = useState<Record<string, Answers>>({});
-  const [aiTextAnswers, setAiTextAnswers] = useState<Record<string, string>>({});
+  const [aiSelectedOption, setAiSelectedOption] = useState<Record<string, string>>({});
   const [showAIQuestion, setShowAIQuestion] = useState(false);
   const [result, setResult] = useState<ScoringResult | null>(null);
 
@@ -86,35 +86,16 @@ export default function PrototypeDemo() {
     [currentStep.id]
   );
 
-  const handleOptionSelect = useCallback(
-    (questionId: string, value: string, isMulti: boolean) => {
-      if (isMulti) {
-        const current = (stepAnswers[questionId] as string[]) || [];
-        const updated = current.includes(value)
-          ? current.filter((v) => v !== value)
-          : [...current, value];
-        updateAnswer(questionId, updated);
-      } else {
-        updateAnswer(questionId, value);
-        // Auto-advance for single select
-        setTimeout(() => goNext(), 300);
-      }
-    },
-    [stepAnswers, updateAnswer]
-  );
-
-  const goNext = useCallback(() => {
+  const goNext = useCallback((aiOptionOverride?: string) => {
     if (showAIQuestion) {
-      // Submit AI answer and advance to next step
-      const aiText = aiTextAnswers[currentStep.id] || '';
-      if (aiText.trim()) {
-        analyzeAnswer(currentStep.id as StepId, aiText, allAnswers);
+      const selected = aiOptionOverride ?? aiSelectedOption[currentStep.id] ?? '';
+      if (selected.trim()) {
+        analyzeAnswer(currentStep.id as StepId, selected, allAnswers);
       }
       setShowAIQuestion(false);
       setCurrentQuestionIndex(0);
 
       if (isLastStep) {
-        // Run scoring engine
         const modifiers = getModifiers();
         const scoringResult = runScoringEngine(allAnswers, modifiers);
         setResult(scoringResult);
@@ -141,8 +122,32 @@ export default function PrototypeDemo() {
     }
   }, [
     showAIQuestion, isLastQuestionInStep, isLastStep, currentStep, allAnswers,
-    aiTextAnswers, analyzeAnswer, generateQuestion, getModifiers,
+    aiSelectedOption, analyzeAnswer, generateQuestion, getModifiers,
   ]);
+
+  const handleOptionSelect = useCallback(
+    (questionId: string, value: string, isMulti: boolean) => {
+      if (isMulti) {
+        const current = (stepAnswers[questionId] as string[]) || [];
+        const updated = current.includes(value)
+          ? current.filter((v) => v !== value)
+          : [...current, value];
+        updateAnswer(questionId, updated);
+      } else {
+        updateAnswer(questionId, value);
+        setTimeout(() => goNext(), 300);
+      }
+    },
+    [stepAnswers, updateAnswer, goNext]
+  );
+
+  const handleAIOptionSelect = useCallback(
+    (opt: string) => {
+      setAiSelectedOption((prev) => ({ ...prev, [currentStep.id]: opt }));
+      setTimeout(() => goNext(opt), 300);
+    },
+    [currentStep.id, goNext]
+  );
 
   const goPrev = useCallback(() => {
     if (showAIQuestion) {
@@ -162,7 +167,7 @@ export default function PrototypeDemo() {
     setCurrentStepIndex(0);
     setCurrentQuestionIndex(0);
     setAllAnswers({});
-    setAiTextAnswers({});
+    setAiSelectedOption({});
     setShowAIQuestion(false);
     setResult(null);
   }, []);
@@ -179,6 +184,10 @@ export default function PrototypeDemo() {
   }
   completedQuestions += currentQuestionIndex + (showAIQuestion ? visibleQuestions.length : 0);
   const progressPercent = Math.min(100, (completedQuestions / Math.max(totalQuestions, 1)) * 100);
+
+  // AI question "Siguiente" is disabled until an option is selected and not loading
+  const aiQuestionReady = showAIQuestion && !aiInsight?.isLoading && aiInsight?.options?.length === 4;
+  const aiOptionSelected = !!aiSelectedOption[currentStep.id];
 
   return (
     <section id="prototype" className="section-padding">
@@ -257,34 +266,49 @@ export default function PrototypeDemo() {
               </p>
 
               {showAIQuestion ? (
-                /* AI QUESTION */
+                /* AI QUESTION — styled like a regular MC question */
                 <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <Sparkles className="w-5 h-5 text-co-green" />
-                    <span className="text-sm font-medium text-co-green">Pregunta personalizada con IA</span>
+                  <div className="flex items-center gap-1.5 mb-4">
+                    <Sparkles className="w-4 h-4 text-co-green" />
+                    <span className="text-xs font-semibold text-co-green uppercase tracking-wider">
+                      IA Personalizada
+                    </span>
                   </div>
 
                   {aiInsight?.isLoading && !aiInsight.question ? (
-                    <div className="flex items-center gap-3 text-co-muted py-8">
+                    <div className="flex items-center gap-3 text-co-muted py-10">
                       <Loader2 className="w-5 h-5 animate-spin" />
                       <span className="text-sm">Generando pregunta personalizada...</span>
                     </div>
                   ) : (
                     <>
                       <h3 className="text-lg font-semibold text-gray-900 mb-6 leading-relaxed">
-                        <MessageSquare className="w-5 h-5 text-co-green inline mr-2 -mt-0.5" />
-                        {aiInsight?.question || 'Cuéntenos más sobre sus expectativas de inversión.'}
+                        {aiInsight?.question || 'Cuéntenos más sobre sus preferencias de inversión.'}
                       </h3>
 
-                      <textarea
-                        value={aiTextAnswers[currentStep.id] || ''}
-                        onChange={(e) =>
-                          setAiTextAnswers((prev) => ({ ...prev, [currentStep.id]: e.target.value }))
-                        }
-                        placeholder="Escriba su respuesta aquí..."
-                        rows={4}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-co-green focus:border-transparent"
-                      />
+                      <div className="space-y-3">
+                        {(aiInsight?.options || []).map((opt, i) => {
+                          const isSelected = aiSelectedOption[currentStep.id] === opt;
+                          return (
+                            <button
+                              key={i}
+                              onClick={() => handleAIOptionSelect(opt)}
+                              className={`w-full text-left px-5 py-4 rounded-xl border-2 transition-all ${
+                                isSelected
+                                  ? 'border-co-green bg-green-50/50 shadow-sm'
+                                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <p className={`font-medium text-sm ${isSelected ? 'text-co-green' : 'text-gray-900'}`}>
+                                  {opt}
+                                </p>
+                                {isSelected && <Check className="w-5 h-5 text-co-green flex-shrink-0" />}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </>
                   )}
                 </div>
@@ -395,12 +419,13 @@ export default function PrototypeDemo() {
                   )}
 
                   <button
-                    onClick={goNext}
+                    onClick={() => goNext()}
                     disabled={
-                      !showAIQuestion &&
-                      currentQuestion &&
-                      currentQuestion.type !== 'slider' &&
-                      !stepAnswers[currentQuestion.id]
+                      showAIQuestion
+                        ? aiQuestionReady && !aiOptionSelected
+                        : currentQuestion &&
+                          currentQuestion.type !== 'slider' &&
+                          !stepAnswers[currentQuestion.id]
                     }
                     className="btn-primary text-sm px-5 py-2.5"
                   >

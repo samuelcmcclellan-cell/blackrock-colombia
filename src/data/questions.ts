@@ -137,12 +137,16 @@ export const questionnaireSteps: QuestionnaireStep[] = [
     questions: [
       {
         id: 'age',
-        question: '¿Cuál es su edad?',
-        type: 'slider',
-        min: 18,
-        max: 80,
-        step: 1,
-        unit: 'años',
+        question: '¿En qué etapa de vida se encuentra?',
+        type: 'single',
+        options: [
+          { value: '18-25', label: 'Joven profesional (18–25)' },
+          { value: '26-35', label: 'Construyendo carrera (26–35)' },
+          { value: '36-45', label: 'Consolidación (36–45)' },
+          { value: '46-55', label: 'Pre-jubilación (46–55)' },
+          { value: '56-65', label: 'Próximo a jubilación (56–65)' },
+          { value: '65+', label: 'Jubilado (65+)' },
+        ],
       },
       {
         id: 'existing_investments',
@@ -337,9 +341,46 @@ export const questionnaireSteps: QuestionnaireStep[] = [
   },
 ];
 
-export const fallbackAIQuestions: Record<StepId, string> = {
-  objetivo: '',
-  finanzas: '¿Hay algún factor financiero personal que crea que debería influir en cómo construimos su portafolio? Por ejemplo, deudas actuales, ingresos variables, o planes financieros próximos.',
-  riesgo: 'Piense en la peor experiencia financiera que ha tenido. ¿Cómo reaccionó y qué aprendió sobre su tolerancia al riesgo?',
-  estilo: '¿Hay algún tipo de empresa, sector o tendencia global en la que crea firmemente y que le gustaría reflejar en su portafolio?',
+export interface FallbackAIQuestion {
+  question: string;
+  options: string[];
+}
+
+export const fallbackAIQuestions: Record<StepId, FallbackAIQuestion> = {
+  objetivo: {
+    question: '¿En qué etapa describe mejor su situación financiera actual?',
+    options: [
+      'Apenas empezando, con poco ahorro',
+      'Ahorrando activamente cada mes',
+      'Con patrimonio consolidado',
+      'Dependiendo de ingresos de inversiones',
+    ],
+  },
+  finanzas: {
+    question: '¿Cuál factor limita más su capacidad de invertir hoy?',
+    options: [
+      'Deudas o créditos pendientes',
+      'Gastos fijos muy altos',
+      'Ingresos variables o inestables',
+      'Ninguno, tengo margen para invertir',
+    ],
+  },
+  riesgo: {
+    question: '¿Cómo reaccionaría si su portafolio cae 15% en un mes?',
+    options: [
+      'Vendería de inmediato para protegerme',
+      'Esperaría con nerviosismo',
+      'Lo vería como algo temporal',
+      'Aprovecharía para comprar más',
+    ],
+  },
+  estilo: {
+    question: '¿Qué sector global le genera más confianza para invertir?',
+    options: [
+      'Tecnología e innovación',
+      'Energía y recursos naturales',
+      'Salud y biotecnología',
+      'Empresas establecidas con dividendos',
+    ],
+  },
 };

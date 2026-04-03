@@ -17,10 +17,10 @@ async function callOpenAI(messages: Array<{ role: string; content: string }>) {
       Authorization: `Bearer ${OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-nano',
       messages,
       temperature: 0.7,
-      max_tokens: 500,
+      max_tokens: 300,
     }),
   });
 
@@ -50,30 +50,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .join('\n');
 
       const stepContextMap: Record<string, string> = {
-        finanzas: 'Genera una pregunta abierta sobre la situación financiera del inversionista que nos ayude a entender factores no cubiertos por las preguntas estándar. Considera su contexto colombiano (deudas, ingresos en COP, planes financieros).',
-        riesgo: 'Genera una pregunta abierta que revele la verdadera tolerancia al riesgo del inversionista. Usa un escenario realista relacionado con el mercado colombiano o eventos recientes.',
-        estilo: 'Genera una pregunta abierta sobre las preferencias de inversión, convicciones o visión del mundo del inversionista que nos ayude a personalizar mejor su portafolio.',
+        finanzas: 'Genera una pregunta corta sobre la situación financiera del inversionista. Temas posibles: deudas actuales, ingresos en COP, o planes financieros próximos en Colombia.',
+        riesgo: 'Genera una pregunta corta que revele la verdadera tolerancia al riesgo. Usa un escenario realista relacionado con el mercado colombiano o latinoamericano.',
+        estilo: 'Genera una pregunta corta sobre las preferencias de inversión o convicciones del inversionista para personalizar mejor su portafolio.',
       };
 
       const userPrompt = `Contexto de respuestas anteriores del inversionista:
 ${contextSummary}
 
-${stepContextMap[stepId] || 'Genera una pregunta relevante.'}
+${stepContextMap[stepId] || 'Genera una pregunta relevante sobre inversiones.'}
 
-Responde SOLO con la pregunta, sin explicaciones adicionales. Máximo 2 oraciones.`;
+INSTRUCCIONES EXACTAS:
+- La pregunta debe tener MÁXIMO 15 palabras
+- Genera EXACTAMENTE 4 opciones de respuesta breves y claras en español
+- Las opciones deben ser concisas (máximo 8 palabras cada una)
+- Devuelve SOLO un JSON válido con este formato exacto, sin ningún texto adicional:
+{"question": "pregunta aquí", "options": ["opción 1", "opción 2", "opción 3", "opción 4"]}`;
 
-      const question = await callOpenAI([
+      const raw = await callOpenAI([
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ]);
 
-      return res.status(200).json({ question: question.trim() });
+      try {
+        const cleaned = raw.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleaned);
+        return res.status(200).json({
+          question: parsed.question || '',
+          options: Array.isArray(parsed.options) ? parsed.options : [],
+        });
+      } catch {
+        return res.status(200).json({ question: raw.trim(), options: [] });
+      }
     }
 
     if (action === 'analyze_answer') {
-      const analysisPrompt = `El inversionista respondió a una pregunta abierta sobre ${stepId}.
+      const analysisPrompt = `El inversionista seleccionó una opción de respuesta a una pregunta sobre ${stepId}.
 
-Respuesta del inversionista: "${answer}"
+Opción seleccionada: "${answer}"
 
 Contexto previo: ${JSON.stringify(answers)}
 

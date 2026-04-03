@@ -61,7 +61,7 @@ export default function Header() {
 
         {/* Subtitle */}
         <span className="hidden lg:block text-xs text-co-muted">
-          Prototipo Conceptual
+          Prototipo por Samuel McClellan &amp; Claude Opus 4.6
         </span>
 
         {/* Nav */}

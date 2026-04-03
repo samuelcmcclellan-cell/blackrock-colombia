@@ -84,8 +84,17 @@ function scoreObjectiveStep(answers: Answers): Partial<DimensionScores> {
 function scoreFinanceStep(answers: Answers): Partial<DimensionScores> {
   const partial: Partial<DimensionScores> = {};
 
-  // Age
-  const age = (answers.age as number) || 35;
+  // Age — supports both legacy numeric and new life-stage bucket string values
+  const ageRaw = answers.age;
+  let age: number;
+  if (typeof ageRaw === 'string') {
+    const ageBucketMap: Record<string, number> = {
+      '18-25': 21, '26-35': 30, '36-45': 40, '46-55': 50, '56-65': 60, '65+': 70,
+    };
+    age = ageBucketMap[ageRaw] || 35;
+  } else {
+    age = (ageRaw as number) || 35;
+  }
   partial.timeHorizon = clamp(Math.round((80 - age) / 6), 1, 10);
 
   // Existing investments → sophistication

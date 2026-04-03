@@ -5,6 +5,7 @@ import type { Answers, AIModifier } from '../engine/scoringEngine';
 
 interface AIInsightState {
   question: string;
+  options: string[];
   isLoading: boolean;
   answer: string;
   modifier: AIModifier | null;
@@ -17,7 +18,7 @@ export function useAIInsight() {
     async (stepId: StepId, allAnswers: Record<string, Answers>) => {
       setInsights((prev) => ({
         ...prev,
-        [stepId]: { question: '', isLoading: true, answer: '', modifier: null },
+        [stepId]: { question: '', options: [], isLoading: true, answer: '', modifier: null },
       }));
 
       try {
@@ -34,20 +35,26 @@ export function useAIInsight() {
         if (!response.ok) throw new Error('API error');
 
         const data = await response.json();
+        const fallback = fallbackAIQuestions[stepId];
         setInsights((prev) => ({
           ...prev,
           [stepId]: {
-            question: data.question || fallbackAIQuestions[stepId],
+            question: data.question || fallback.question,
+            options: Array.isArray(data.options) && data.options.length === 4
+              ? data.options
+              : fallback.options,
             isLoading: false,
             answer: '',
             modifier: null,
           },
         }));
       } catch {
+        const fallback = fallbackAIQuestions[stepId];
         setInsights((prev) => ({
           ...prev,
           [stepId]: {
-            question: fallbackAIQuestions[stepId],
+            question: fallback.question,
+            options: fallback.options,
             isLoading: false,
             answer: '',
             modifier: null,
