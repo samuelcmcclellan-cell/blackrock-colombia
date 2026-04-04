@@ -116,7 +116,7 @@ export default function HeroSection() {
           transition={{ duration: 0.6, delay: 0.6 }}
           className="max-w-4xl mx-auto mt-8"
         >
-          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-5 py-3.5 text-xs text-amber-800">
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-5 py-3.5 text-sm text-amber-800">
             <span className="font-bold mt-0.5 flex-shrink-0">⚠</span>
             <p>
               <strong>Prototipo conceptual — solo para demostración interna.</strong>{' '}

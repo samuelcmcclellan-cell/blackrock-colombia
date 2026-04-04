@@ -9,7 +9,10 @@ Entiendes el contexto fiscal colombiano, las pensiones obligatorias, los CDTs, y
 Tu objetivo es hacer una pregunta perspicaz que revele las verdaderas preferencias y tolerancia al riesgo del inversionista.
 Sé conciso y directo. No uses jerga innecesaria.`;
 
-async function callOpenAI(messages: Array<{ role: string; content: string }>) {
+async function callOpenAI(
+  messages: Array<{ role: string; content: string }>,
+  opts?: { temperature?: number; max_tokens?: number }
+) {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -19,8 +22,8 @@ async function callOpenAI(messages: Array<{ role: string; content: string }>) {
     body: JSON.stringify({
       model: 'gpt-4.1-nano',
       messages,
-      temperature: 0.7,
-      max_tokens: 300,
+      temperature: opts?.temperature ?? 0.7,
+      max_tokens: opts?.max_tokens ?? 300,
     }),
   });
 
@@ -114,6 +117,82 @@ Responde SOLO con el JSON, sin texto adicional.`;
           timeHorizonSignal: 0,
           behavioralNotes: 'No se pudo analizar la respuesta.',
           confidenceLevel: 0.3,
+        });
+      }
+    }
+
+    if (action === 'deliberate_portfolio') {
+      const { candidates, aiModifiers } = req.body;
+
+      const candidateSummary = (candidates || [])
+        .map(
+          (c: { id: string; name: string; description: string; distance: number }, i: number) =>
+            `${i + 1}. ${c.name} (id: ${c.id}) — ${c.description} [distancia: ${c.distance.toFixed(2)}]`
+        )
+        .join('\n');
+
+      const answerSummary = Object.entries(answers || {})
+        .map(([step, stepAnswers]) => `${step}: ${JSON.stringify(stepAnswers)}`)
+        .join('\n');
+
+      const modifierSummary = (aiModifiers || [])
+        .map((m: { riskSignal?: number; timeHorizonSignal?: number; behavioralNotes?: string }) =>
+          `riskSignal: ${m.riskSignal}, timeHorizonSignal: ${m.timeHorizonSignal}, notas: ${m.behavioralNotes || 'N/A'}`
+        )
+        .join('\n');
+
+      const deliberationPrompt = `Eres un asesor financiero senior en Colombia decidiendo qué portafolio de inversión recomendar.
+
+Respuestas del inversionista:
+${answerSummary}
+
+Señales del análisis de IA:
+${modifierSummary}
+
+Portafolios candidatos (ordenados por compatibilidad):
+${candidateSummary}
+
+Analiza el perfil completo del inversionista y delibera sobre cuál portafolio se ajusta mejor.
+
+Responde SOLO con un JSON válido con este formato exacto:
+{
+  "thinking": [
+    "paso de deliberación 1 en español (máx 20 palabras)",
+    "paso de deliberación 2 en español (máx 20 palabras)",
+    "paso de deliberación 3 en español (máx 20 palabras)",
+    "paso de deliberación 4 en español (máx 20 palabras)"
+  ],
+  "selectedPortfolioId": "id del portafolio elegido",
+  "reasoning": "explicación final de 1-2 oraciones en español de por qué este portafolio es el mejor para este inversionista"
+}
+
+REGLAS:
+- Los pasos de deliberación deben ser observaciones específicas sobre ESTE inversionista (horizonte, tolerancia, preferencias)
+- Elige uno de los portafolios candidatos proporcionados
+- El razonamiento final debe ser personalizado y convincente
+- Todo en español colombiano profesional`;
+
+      const raw = await callOpenAI(
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: deliberationPrompt },
+        ],
+        { temperature: 0.4, max_tokens: 500 }
+      );
+
+      try {
+        const cleaned = raw.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleaned);
+        return res.status(200).json({
+          thinking: Array.isArray(parsed.thinking) ? parsed.thinking : [],
+          selectedPortfolioId: parsed.selectedPortfolioId || '',
+          reasoning: parsed.reasoning || '',
+        });
+      } catch {
+        return res.status(200).json({
+          thinking: [],
+          selectedPortfolioId: '',
+          reasoning: '',
         });
       }
     }

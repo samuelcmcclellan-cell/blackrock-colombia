@@ -1,13 +1,15 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Lock, Eye, EyeOff } from 'lucide-react';
+import { Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import Header from './components/Header';
 import HeroSection from './components/HeroSection';
 import OpportunitySection from './components/OpportunitySection';
 import HowItWorks from './components/HowItWorks';
 import OperatingModels from './components/OperatingModels';
 import PrototypeDemo from './components/PrototypeDemo';
+import ResultsPage from './components/ResultsPage';
 import DisclaimerFooter from './components/DisclaimerFooter';
+import type { ScoringResult } from './engine/scoringEngine';
 
 const CORRECT_PASSWORD = 'CO2026$';
 
@@ -100,8 +102,24 @@ function AuthGate({ onAuth }: { onAuth: () => void }) {
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState(false);
+  const [result, setResult] = useState<ScoringResult | null>(null);
 
   const handleAuth = useCallback(() => setAuthenticated(true), []);
+
+  const handleResult = useCallback((r: ScoringResult) => {
+    setResult(r);
+  }, []);
+
+  const handleBackToHome = useCallback(() => {
+    setResult(null);
+  }, []);
+
+  // Scroll to top when entering results
+  useEffect(() => {
+    if (result) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [result]);
 
   if (!authenticated) {
     return <AuthGate onAuth={handleAuth} />;
@@ -109,15 +127,61 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-co-bg">
-      <Header />
-      <main>
-        <HeroSection />
-        <OpportunitySection />
-        <HowItWorks />
-        <OperatingModels />
-        <PrototypeDemo />
-      </main>
-      <DisclaimerFooter />
+      <AnimatePresence mode="wait">
+        {result ? (
+          <motion.div
+            key="results"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            {/* Minimal results header */}
+            <div className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100">
+              <div className="container-max flex items-center justify-between h-16 sm:h-20 px-4 sm:px-6 lg:px-8">
+                <div className="flex items-center gap-3">
+                  <span className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900">
+                    BlackRock
+                  </span>
+                  <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-co-green text-white">
+                    Personalización Directa
+                  </span>
+                </div>
+                <button
+                  onClick={handleBackToHome}
+                  className="flex items-center gap-1.5 text-sm font-medium text-co-muted hover:text-gray-900 transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Volver al cuestionario
+                </button>
+              </div>
+            </div>
+
+            <main className="pt-20">
+              <ResultsPage result={result} onRestart={handleBackToHome} />
+            </main>
+            <DisclaimerFooter />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="home"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Header />
+            <main>
+              <HeroSection />
+              <OpportunitySection />
+              <HowItWorks />
+              <OperatingModels />
+              <PrototypeDemo onResult={handleResult} />
+            </main>
+            <DisclaimerFooter />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

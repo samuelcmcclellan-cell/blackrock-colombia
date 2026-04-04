@@ -1,10 +1,9 @@
-import { useState, useCallback, useMemo, createElement } from 'react';
+import { useState, useCallback, useMemo, createElement, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, ChevronRight, ChevronLeft, SkipForward, Sparkles, Loader2 } from 'lucide-react';
+import { Check, ChevronRight, ChevronLeft, SkipForward, Sparkles, Loader2, Brain } from 'lucide-react';
 import { questionnaireSteps, type StepId, type Question } from '../data/questions';
 import { useAIInsight } from '../hooks/useAIInsight';
-import { runScoringEngine, type Answers, type ScoringResult } from '../engine/scoringEngine';
-import ResultsPage from './ResultsPage';
+import { runScoringEngine, applyThemeOverlaysPublic, type Answers, type ScoringResult } from '../engine/scoringEngine';
 
 function SliderInput({
   question: q,
@@ -43,13 +42,219 @@ function SliderInput({
   );
 }
 
-export default function PrototypeDemo() {
+interface DeliberationResult {
+  thinking: string[];
+  selectedPortfolioId: string;
+  reasoning: string;
+}
+
+function DeliberationView({
+  scoringResult,
+  allAnswers,
+  aiModifiers,
+  onComplete,
+}: {
+  scoringResult: ScoringResult;
+  allAnswers: Record<string, Answers>;
+  aiModifiers: { riskSignal?: number; timeHorizonSignal?: number; behavioralNotes?: string }[];
+  onComplete: (finalResult: ScoringResult) => void;
+}) {
+  const [visibleSteps, setVisibleSteps] = useState(0);
+  const [reasoning, setReasoning] = useState('');
+  const [thinkingSteps, setThinkingSteps] = useState<string[]>([]);
+  const [phase, setPhase] = useState<'loading' | 'thinking' | 'done'>('loading');
+  const hasStarted = useRef(false);
+
+  useEffect(() => {
+    if (hasStarted.current) return;
+    hasStarted.current = true;
+
+    const candidates = scoringResult.topCandidates.map((c) => ({
+      id: c.portfolio.id,
+      name: c.portfolio.name,
+      description: c.portfolio.description,
+      distance: c.distance,
+    }));
+
+    (async () => {
+      try {
+        const response = await fetch('/api/ai-insight', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'deliberate_portfolio',
+            answers: allAnswers,
+            candidates,
+            aiModifiers,
+          }),
+        });
+
+        if (!response.ok) throw new Error('API error');
+        const data: DeliberationResult = await response.json();
+
+        const steps = data.thinking?.length
+          ? data.thinking
+          : [
+              'Analizando su perfil de riesgo y horizonte temporal...',
+              'Evaluando sus preferencias de inversión...',
+              'Comparando portafolios candidatos...',
+              'Seleccionando la mejor opción para su perfil...',
+            ];
+
+        setThinkingSteps(steps);
+        setPhase('thinking');
+
+        // Animate steps one by one
+        for (let i = 0; i < steps.length; i++) {
+          await new Promise((r) => setTimeout(r, 800));
+          setVisibleSteps(i + 1);
+        }
+
+        // Show reasoning
+        await new Promise((r) => setTimeout(r, 600));
+        setReasoning(data.reasoning || 'Este portafolio se ajusta a su perfil de inversión.');
+        setPhase('done');
+
+        // Resolve final portfolio
+        await new Promise((r) => setTimeout(r, 1800));
+
+        const chosenId = data.selectedPortfolioId;
+        const validCandidate = scoringResult.topCandidates.find(
+          (c) => c.portfolio.id === chosenId
+        );
+
+        if (validCandidate) {
+          const finalAllocations = applyThemeOverlaysPublic(
+            [...validCandidate.portfolio.allocations],
+            scoringResult.selectedThemes
+          );
+          onComplete({
+            ...scoringResult,
+            portfolio: validCandidate.portfolio,
+            allocations: finalAllocations,
+            matchDistance: validCandidate.distance,
+          });
+        } else {
+          onComplete(scoringResult);
+        }
+      } catch {
+        // Fallback: show generic thinking then proceed with engine result
+        const fallbackSteps = [
+          'Analizando su perfil de riesgo y horizonte temporal...',
+          'Evaluando sus preferencias de inversión...',
+          'Comparando portafolios candidatos...',
+          'Seleccionando la mejor opción para su perfil...',
+        ];
+        setThinkingSteps(fallbackSteps);
+        setPhase('thinking');
+
+        for (let i = 0; i < fallbackSteps.length; i++) {
+          await new Promise((r) => setTimeout(r, 800));
+          setVisibleSteps(i + 1);
+        }
+
+        await new Promise((r) => setTimeout(r, 600));
+        setReasoning('Este portafolio se ajusta a su perfil de inversión.');
+        setPhase('done');
+
+        await new Promise((r) => setTimeout(r, 1800));
+        onComplete(scoringResult);
+      }
+    })();
+  }, [scoringResult, allAnswers, aiModifiers, onComplete]);
+
+  return (
+    <div className="card p-8 sm:p-10">
+      <div className="flex items-center gap-2 mb-6">
+        <div className="w-10 h-10 rounded-full bg-co-green/10 flex items-center justify-center">
+          <Brain className="w-5 h-5 text-co-green" />
+        </div>
+        <div>
+          <h3 className="font-display text-lg font-bold text-gray-900">
+            Analizando su perfil...
+          </h3>
+          <p className="text-xs text-co-muted">Nuestro motor de IA está evaluando sus respuestas</p>
+        </div>
+      </div>
+
+      <div className="space-y-4 min-h-[200px]">
+        {phase === 'loading' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex items-center gap-3 text-co-muted py-8"
+          >
+            <Loader2 className="w-5 h-5 animate-spin text-co-green" />
+            <span className="text-sm">Preparando análisis personalizado...</span>
+          </motion.div>
+        )}
+
+        {phase !== 'loading' && thinkingSteps.map((step, i) => (
+          <AnimatePresence key={i}>
+            {i < visibleSteps && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: 'easeOut' }}
+                className="flex items-start gap-3"
+              >
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.2, type: 'spring', stiffness: 300 }}
+                  className="mt-1 flex-shrink-0"
+                >
+                  <div className="w-5 h-5 rounded-full bg-co-green flex items-center justify-center">
+                    <Check className="w-3 h-3 text-white" />
+                  </div>
+                </motion.div>
+                <p className="text-sm text-gray-700 leading-relaxed pt-0.5">{step}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        ))}
+
+        {reasoning && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="mt-6 pt-5 border-t border-gray-100"
+          >
+            <p className="text-sm font-medium text-gray-900 leading-relaxed">
+              {reasoning}
+            </p>
+          </motion.div>
+        )}
+
+        {phase === 'done' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="flex items-center gap-2 text-co-green mt-4"
+          >
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-xs font-medium">Preparando su portafolio personalizado...</span>
+          </motion.div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function PrototypeDemo({
+  onResult,
+}: {
+  onResult: (result: ScoringResult) => void;
+}) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [allAnswers, setAllAnswers] = useState<Record<string, Answers>>({});
   const [aiSelectedOption, setAiSelectedOption] = useState<Record<string, string>>({});
   const [showAIQuestion, setShowAIQuestion] = useState(false);
-  const [result, setResult] = useState<ScoringResult | null>(null);
+  const [deliberationResult, setDeliberationResult] = useState<ScoringResult | null>(null);
+  const [showDeliberation, setShowDeliberation] = useState(false);
 
   const { insights, generateQuestion, analyzeAnswer, getModifiers } = useAIInsight();
 
@@ -86,6 +291,13 @@ export default function PrototypeDemo() {
     [currentStep.id]
   );
 
+  const startDeliberation = useCallback(() => {
+    const modifiers = getModifiers();
+    const scoringResult = runScoringEngine(allAnswers, modifiers);
+    setDeliberationResult(scoringResult);
+    setShowDeliberation(true);
+  }, [allAnswers, getModifiers]);
+
   const goNext = useCallback((aiOptionOverride?: string) => {
     if (showAIQuestion) {
       const selected = aiOptionOverride ?? aiSelectedOption[currentStep.id] ?? '';
@@ -96,9 +308,7 @@ export default function PrototypeDemo() {
       setCurrentQuestionIndex(0);
 
       if (isLastStep) {
-        const modifiers = getModifiers();
-        const scoringResult = runScoringEngine(allAnswers, modifiers);
-        setResult(scoringResult);
+        startDeliberation();
       } else {
         setCurrentStepIndex((i) => i + 1);
       }
@@ -110,9 +320,7 @@ export default function PrototypeDemo() {
         setShowAIQuestion(true);
         generateQuestion(currentStep.id as StepId, allAnswers);
       } else if (isLastStep) {
-        const modifiers = getModifiers();
-        const scoringResult = runScoringEngine(allAnswers, modifiers);
-        setResult(scoringResult);
+        startDeliberation();
       } else {
         setCurrentStepIndex((i) => i + 1);
         setCurrentQuestionIndex(0);
@@ -122,7 +330,7 @@ export default function PrototypeDemo() {
     }
   }, [
     showAIQuestion, isLastQuestionInStep, isLastStep, currentStep, allAnswers,
-    aiSelectedOption, analyzeAnswer, generateQuestion, getModifiers,
+    aiSelectedOption, analyzeAnswer, generateQuestion, startDeliberation,
   ]);
 
   const handleOptionSelect = useCallback(
@@ -163,18 +371,12 @@ export default function PrototypeDemo() {
     }
   }, [showAIQuestion, currentQuestionIndex, currentStepIndex]);
 
-  const handleRestart = useCallback(() => {
-    setCurrentStepIndex(0);
-    setCurrentQuestionIndex(0);
-    setAllAnswers({});
-    setAiSelectedOption({});
-    setShowAIQuestion(false);
-    setResult(null);
-  }, []);
-
-  if (result) {
-    return <ResultsPage result={result} onRestart={handleRestart} />;
-  }
+  const handleDeliberationComplete = useCallback(
+    (finalResult: ScoringResult) => {
+      onResult(finalResult);
+    },
+    [onResult]
+  );
 
   // Calculate overall progress
   const totalQuestions = questionnaireSteps.reduce((sum, s) => sum + s.questions.length + (s.hasAI ? 1 : 0), 0) || 1;
@@ -208,6 +410,47 @@ export default function PrototypeDemo() {
         </motion.div>
 
         <div className="max-w-2xl mx-auto">
+          {showDeliberation && deliberationResult ? (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key="deliberation"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.4 }}
+              >
+                {/* All steps completed indicator */}
+                <div className="flex items-center justify-center gap-2 mb-8">
+                  {questionnaireSteps.map((step, i) => (
+                    <div key={step.id} className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold bg-co-green text-white">
+                        <Check className="w-4 h-4" />
+                      </div>
+                      <span className="hidden sm:inline text-xs font-medium text-co-muted">
+                        {step.title}
+                      </span>
+                      {i < questionnaireSteps.length - 1 && (
+                        <div className="w-8 h-0.5 bg-co-green" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Full progress bar */}
+                <div className="w-full h-1.5 bg-gray-200 rounded-full mb-8 overflow-hidden">
+                  <div className="h-full bg-co-green rounded-full w-full" />
+                </div>
+
+                <DeliberationView
+                  scoringResult={deliberationResult}
+                  allAnswers={allAnswers}
+                  aiModifiers={getModifiers()}
+                  onComplete={handleDeliberationComplete}
+                />
+              </motion.div>
+            </AnimatePresence>
+          ) : (
+          <>
           {/* Step Tabs */}
           <div className="flex items-center justify-center gap-2 mb-8">
             {questionnaireSteps.map((step, i) => {
@@ -405,8 +648,7 @@ export default function PrototypeDemo() {
                         setShowAIQuestion(false);
                         setCurrentQuestionIndex(0);
                         if (isLastStep) {
-                          const modifiers = getModifiers();
-                          setResult(runScoringEngine(allAnswers, modifiers));
+                          startDeliberation();
                         } else {
                           setCurrentStepIndex((i) => i + 1);
                         }
@@ -442,6 +684,8 @@ export default function PrototypeDemo() {
               </div>
             </motion.div>
           </AnimatePresence>
+          </>
+          )}
         </div>
       </div>
     </section>

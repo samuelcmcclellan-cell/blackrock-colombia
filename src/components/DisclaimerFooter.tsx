@@ -2,7 +2,7 @@ export default function DisclaimerFooter() {
   return (
     <footer className="bg-gray-900 text-gray-400 py-12 px-4 sm:px-6 lg:px-8">
       <div className="container-max text-center">
-        <p className="text-xs leading-relaxed max-w-3xl mx-auto">
+        <p className="text-sm leading-relaxed max-w-3xl mx-auto">
           <span className="text-white font-semibold">Solo para uso interno</span> — Este es un
           prototipo conceptual creado para discusión interna. No constituye una oferta de inversión,
           asesoría financiera ni recomendación de productos. Todos los datos mostrados son

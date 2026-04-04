@@ -293,12 +293,20 @@ function applyThemeOverlays(
   return modified;
 }
 
+export { applyThemeOverlays as applyThemeOverlaysPublic };
+
+export interface PortfolioCandidate {
+  portfolio: ModelPortfolio;
+  distance: number;
+}
+
 export interface ScoringResult {
   portfolio: ModelPortfolio;
   finalScores: DimensionScores;
   allocations: PortfolioAllocation[];
   matchDistance: number;
   selectedThemes: string[];
+  topCandidates: PortfolioCandidate[];
 }
 
 export function runScoringEngine(
@@ -319,17 +327,14 @@ export function runScoringEngine(
   // Step 3: Apply AI modifiers
   merged = applyAIModifiers(merged, aiModifiers);
 
-  // Step 4: Find nearest portfolio
-  let bestPortfolio = modelPortfolios[0];
-  let bestDistance = Infinity;
+  // Step 4: Find nearest portfolios (rank all by distance)
+  const ranked: PortfolioCandidate[] = modelPortfolios
+    .map((p) => ({ portfolio: p, distance: weightedEuclideanDistance(merged, p.scores) }))
+    .sort((a, b) => a.distance - b.distance);
 
-  for (const portfolio of modelPortfolios) {
-    const dist = weightedEuclideanDistance(merged, portfolio.scores);
-    if (dist < bestDistance) {
-      bestDistance = dist;
-      bestPortfolio = portfolio;
-    }
-  }
+  const bestPortfolio = ranked[0].portfolio;
+  const bestDistance = ranked[0].distance;
+  const topCandidates = ranked.slice(0, 5);
 
   // Step 5: Apply theme overlays
   const selectedThemes = ((allAnswers.estilo?.themes as string[]) || []);
@@ -341,5 +346,6 @@ export function runScoringEngine(
     allocations: finalAllocations,
     matchDistance: bestDistance,
     selectedThemes,
+    topCandidates,
   };
 }

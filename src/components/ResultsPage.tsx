@@ -8,8 +8,6 @@ import {
 import { RotateCcw, TrendingUp, DollarSign, BarChart3, Layers } from 'lucide-react';
 import { fundMap, assetClassColors } from '../data/funds';
 import type { ScoringResult } from '../engine/scoringEngine';
-import type { DimensionScores } from '../data/portfolios';
-
 const COLORS = ['#00A651', '#1A73E8', '#6B7280', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#EF4444'];
 
 function formatCOP(value: number): string {
@@ -23,15 +21,6 @@ function getRiskBadge(level: number): { label: string; className: string } {
   if (level <= 8) return { label: 'Moderado-Alto', className: 'bg-amber-100 text-amber-700' };
   return { label: 'Agresivo', className: 'bg-red-100 text-red-700' };
 }
-
-const keyDimensionConfig: { key: keyof DimensionScores; label: string; max: number }[] = [
-  { key: 'riskTolerance', label: 'Tolerancia al Riesgo', max: 10 },
-  { key: 'timeHorizon', label: 'Horizonte Temporal', max: 10 },
-  { key: 'volatilityComfort', label: 'Comodidad con Volatilidad', max: 5 },
-  { key: 'liquidityNeed', label: 'Necesidad de Liquidez', max: 5 },
-  { key: 'investmentSophistication', label: 'Sofisticación', max: 5 },
-  { key: 'esgPreference', label: 'Preferencia ESG', max: 3 },
-];
 
 export default function ResultsPage({
   result,
@@ -121,7 +110,7 @@ export default function ResultsPage({
             {/* Badges */}
             <div className="flex flex-wrap items-center gap-2 mb-5">
               <span className={`px-3 py-1 rounded-full text-xs font-semibold ${riskBadge.className}`}>
-                {riskBadge.label} · Nivel {portfolio.riskLevel}/10
+                {riskBadge.label}
               </span>
               {result.selectedThemes.length > 0 && (
                 <span className="px-3 py-1 rounded-full text-xs font-medium bg-white/10 text-white/70">
@@ -269,71 +258,34 @@ export default function ResultsPage({
           </motion.div>
         </div>
 
-        {/* 3. INVESTOR PROFILE: Radar + Dimension Scores */}
-        <div className="grid lg:grid-cols-2 gap-8 mb-8">
-          {/* Radar Chart */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="card p-8"
-          >
-            <h4 className="font-display text-lg font-bold text-gray-900 mb-6">
-              Perfil del Inversionista
-            </h4>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="70%">
-                  <PolarGrid stroke="#e5e7eb" />
-                  <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 10, fill: '#6B7280' }} />
-                  <PolarRadiusAxis angle={90} domain={[0, 10]} tick={false} axisLine={false} />
-                  <Radar
-                    dataKey="value"
-                    stroke="#00A651"
-                    fill="#00A651"
-                    fillOpacity={0.15}
-                    strokeWidth={2}
-                  />
-                </RadarChart>
-              </ResponsiveContainer>
-            </div>
-          </motion.div>
-
-          {/* Key Dimension Scores */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.25 }}
-            className="card p-8"
-          >
-            <h4 className="font-display text-lg font-bold text-gray-900 mb-6">
-              Sus Dimensiones Clave
-            </h4>
-            <div className="space-y-5">
-              {keyDimensionConfig.map(({ key, label, max }) => {
-                const raw = (finalScores as unknown as Record<string, number>)[key] || 0;
-                const pct = Math.min(100, (raw / max) * 100);
-                const rounded = Math.round(raw * 10) / 10;
-                return (
-                  <div key={key}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-medium text-gray-700">{label}</span>
-                      <span className="text-xs font-bold text-gray-900">{rounded} / {max}</span>
-                    </div>
-                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-co-green rounded-full transition-all duration-700"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </motion.div>
-        </div>
+        {/* 3. INVESTOR PROFILE: Radar Chart */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="card p-8 mb-8"
+        >
+          <h4 className="font-display text-lg font-bold text-gray-900 mb-6">
+            Perfil del Inversionista
+          </h4>
+          <div className="h-80 max-w-lg mx-auto">
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="75%">
+                <PolarGrid stroke="#e5e7eb" />
+                <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11, fill: '#6B7280' }} />
+                <PolarRadiusAxis domain={[0, 10]} tick={false} axisLine={false} />
+                <Radar
+                  dataKey="value"
+                  stroke="#00A651"
+                  fill="#00A651"
+                  fillOpacity={0.15}
+                  strokeWidth={2}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
 
         {/* 4. GROWTH PROJECTION */}
         <motion.div
