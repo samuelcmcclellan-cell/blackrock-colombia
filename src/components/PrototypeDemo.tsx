@@ -1,9 +1,10 @@
 import { useState, useCallback, useMemo, createElement, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, ChevronRight, ChevronLeft, SkipForward, Sparkles, Loader2, Brain } from 'lucide-react';
+import { Check, ChevronRight, ChevronLeft, SkipForward, Sparkles, Loader2, Brain, Lightbulb } from 'lucide-react';
 import { questionnaireSteps, type StepId, type Question } from '../data/questions';
 import { useAIInsight } from '../hooks/useAIInsight';
 import { runScoringEngine, applyThemeOverlaysPublic, type Answers, type ScoringResult } from '../engine/scoringEngine';
+import { useAudio } from '../audio/useAudio';
 
 function SliderInput({
   question: q,
@@ -64,10 +65,14 @@ function DeliberationView({
   const [thinkingSteps, setThinkingSteps] = useState<string[]>([]);
   const [phase, setPhase] = useState<'loading' | 'thinking' | 'done'>('loading');
   const hasStarted = useRef(false);
+  const audio = useAudio();
 
   useEffect(() => {
     if (hasStarted.current) return;
     hasStarted.current = true;
+
+    audio.playSfx('deliberation_start');
+    audio.playStaticVoice('deliberation_intro');
 
     const candidates = scoringResult.topCandidates.map((c) => ({
       id: c.portfolio.id,
@@ -107,13 +112,17 @@ function DeliberationView({
         // Animate steps one by one
         for (let i = 0; i < steps.length; i++) {
           await new Promise((r) => setTimeout(r, 800));
+          audio.playSfxRandom(['thinking_tick_1', 'thinking_tick_2', 'thinking_tick_3']);
           setVisibleSteps(i + 1);
         }
 
         // Show reasoning
         await new Promise((r) => setTimeout(r, 600));
-        setReasoning(data.reasoning || 'Este portafolio se ajusta a su perfil de inversión.');
+        const finalReasoning = data.reasoning || 'Este portafolio se ajusta a su perfil de inversión.';
+        setReasoning(finalReasoning);
+        audio.streamTTS(finalReasoning);
         setPhase('done');
+        audio.playSfx('portfolio_reveal');
 
         // Resolve final portfolio
         await new Promise((r) => setTimeout(r, 1800));
@@ -150,18 +159,22 @@ function DeliberationView({
 
         for (let i = 0; i < fallbackSteps.length; i++) {
           await new Promise((r) => setTimeout(r, 800));
+          audio.playSfxRandom(['thinking_tick_1', 'thinking_tick_2', 'thinking_tick_3']);
           setVisibleSteps(i + 1);
         }
 
         await new Promise((r) => setTimeout(r, 600));
-        setReasoning('Este portafolio se ajusta a su perfil de inversión.');
+        const fallbackReasoning = 'Este portafolio se ajusta a su perfil de inversión.';
+        setReasoning(fallbackReasoning);
+        audio.streamTTS(fallbackReasoning);
         setPhase('done');
+        audio.playSfx('portfolio_reveal');
 
         await new Promise((r) => setTimeout(r, 1800));
         onComplete(scoringResult);
       }
     })();
-  }, [scoringResult, allAnswers, aiModifiers, onComplete]);
+  }, [scoringResult, allAnswers, aiModifiers, onComplete, audio]);
 
   return (
     <div className="card p-8 sm:p-10">
@@ -257,6 +270,7 @@ export default function PrototypeDemo({
   const [showDeliberation, setShowDeliberation] = useState(false);
 
   const { insights, generateQuestion, analyzeAnswer, getModifiers } = useAIInsight();
+  const audio = useAudio();
 
   const currentStep = questionnaireSteps[currentStepIndex];
   const stepAnswers = allAnswers[currentStep.id] || {};
@@ -278,6 +292,30 @@ export default function PrototypeDemo({
   const isLastStep = currentStepIndex >= questionnaireSteps.length - 1;
   const aiInsight = insights[currentStep.id];
 
+  // Voice cue when transitioning into a new section
+  useEffect(() => {
+    const id = currentStep.id;
+    if (id === 'finanzas') audio.playStaticVoice('step_finanzas');
+    else if (id === 'riesgo') audio.playStaticVoice('step_riesgo');
+    else if (id === 'estilo') audio.playStaticVoice('step_estilo');
+  }, [currentStep.id, audio]);
+
+  // Stream the AI-generated question aloud once it arrives.
+  // The streamed question itself is the audio cue — no static "thinking" voice
+  // here, which previously could overlap the streamed TTS for a doubled-voice effect.
+  const lastSpokenQuestion = useRef<string>('');
+  useEffect(() => {
+    if (
+      showAIQuestion &&
+      aiInsight?.question &&
+      !aiInsight.isLoading &&
+      aiInsight.question !== lastSpokenQuestion.current
+    ) {
+      lastSpokenQuestion.current = aiInsight.question;
+      audio.streamTTS(aiInsight.question);
+    }
+  }, [showAIQuestion, aiInsight?.question, aiInsight?.isLoading, audio]);
+
   const updateAnswer = useCallback(
     (questionId: string, value: string | string[] | number) => {
       setAllAnswers((prev) => ({
@@ -297,6 +335,8 @@ export default function PrototypeDemo({
     setDeliberationResult(scoringResult);
     setShowDeliberation(true);
   }, [allAnswers, getModifiers]);
+
+  const goNextRef = useRef<(opt?: string) => void>(() => {});
 
   const goNext = useCallback((aiOptionOverride?: string) => {
     if (showAIQuestion) {
@@ -333,8 +373,14 @@ export default function PrototypeDemo({
     aiSelectedOption, analyzeAnswer, generateQuestion, startDeliberation,
   ]);
 
+  // Keep a live reference so deferred timers always invoke the latest goNext —
+  // the 300ms auto-advance after an answer needs the post-render version
+  // (where new conditional questions are now in visibleQuestions).
+  goNextRef.current = goNext;
+
   const handleOptionSelect = useCallback(
     (questionId: string, value: string, isMulti: boolean) => {
+      audio.playSfxRandom(['option_select_1', 'option_select_2', 'option_select_3']);
       if (isMulti) {
         const current = (stepAnswers[questionId] as string[]) || [];
         const updated = current.includes(value)
@@ -343,18 +389,19 @@ export default function PrototypeDemo({
         updateAnswer(questionId, updated);
       } else {
         updateAnswer(questionId, value);
-        setTimeout(() => goNext(), 300);
+        setTimeout(() => goNextRef.current(), 300);
       }
     },
-    [stepAnswers, updateAnswer, goNext]
+    [stepAnswers, updateAnswer, audio]
   );
 
   const handleAIOptionSelect = useCallback(
     (opt: string) => {
+      audio.playSfxRandom(['option_select_1', 'option_select_2', 'option_select_3']);
       setAiSelectedOption((prev) => ({ ...prev, [currentStep.id]: opt }));
-      setTimeout(() => goNext(opt), 300);
+      setTimeout(() => goNextRef.current(opt), 300);
     },
-    [currentStep.id, goNext]
+    [currentStep.id, audio]
   );
 
   const goPrev = useCallback(() => {
@@ -501,6 +548,7 @@ export default function PrototypeDemo({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -30 }}
               transition={{ duration: 0.3 }}
+              onAnimationStart={() => audio.playSfxRandom(['step_swoosh_1', 'step_swoosh_2'])}
               className="card p-8"
             >
               {/* Step subtitle */}
@@ -558,9 +606,21 @@ export default function PrototypeDemo({
               ) : currentQuestion ? (
                 /* STANDARD QUESTION */
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-6 leading-relaxed">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3 leading-relaxed">
                     {currentQuestion.question}
                   </h3>
+
+                  {currentQuestion.microLearning && (
+                    <div className="mb-6 flex gap-2.5 rounded-lg bg-co-green/5 border border-co-green/20 px-3.5 py-2.5">
+                      <Lightbulb className="w-4 h-4 text-co-green flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-gray-700 leading-relaxed">
+                        <span className="font-semibold text-co-green">¿Sabía qué?</span>{' '}
+                        {currentQuestion.microLearning}
+                      </p>
+                    </div>
+                  )}
+
+                  {!currentQuestion.microLearning && <div className="mb-3" />}
 
                   {currentQuestion.type === 'slider' && (
                     <SliderInput

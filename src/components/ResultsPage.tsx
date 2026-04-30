@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
@@ -8,6 +8,7 @@ import {
 import { RotateCcw, TrendingUp, DollarSign, BarChart3, Layers } from 'lucide-react';
 import { fundMap, assetClassColors } from '../data/funds';
 import type { ScoringResult } from '../engine/scoringEngine';
+import { useAudio } from '../audio/useAudio';
 const COLORS = ['#00A651', '#1A73E8', '#6B7280', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#EF4444'];
 
 function formatCOP(value: number): string {
@@ -30,6 +31,14 @@ export default function ResultsPage({
   onRestart: () => void;
 }) {
   const { portfolio, finalScores, allocations } = result;
+  const audio = useAudio();
+
+  useEffect(() => {
+    audio.playSfx('results_celebrate');
+    const t = setTimeout(() => audio.playStaticVoice('results_title'), 800);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const pieData = useMemo(
     () =>

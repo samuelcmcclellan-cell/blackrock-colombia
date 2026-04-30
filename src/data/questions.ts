@@ -22,6 +22,8 @@ export interface Question {
   unit?: string;
   placeholder?: string;
   conditionalOn?: { questionId: string; values: string[] };
+  /** Optional inline ETF / investing microlearning shown beneath the prompt. */
+  microLearning?: string;
 }
 
 export interface QuestionnaireStep {
@@ -34,11 +36,13 @@ export interface QuestionnaireStep {
 
 export const questionnaireSteps: QuestionnaireStep[] = [
   // --- STEP 1: OBJETIVO ---
+  // AI fires after the parent + 1 conditional answer, so the user feels the AI
+  // experience after roughly the first 2–3 answers rather than at the end.
   {
     id: 'objetivo',
     title: 'Objetivo',
     subtitle: 'Cuéntenos sobre su meta de inversión',
-    hasAI: false,
+    hasAI: true,
     questions: [
       {
         id: 'goal',
@@ -152,33 +156,13 @@ export const questionnaireSteps: QuestionnaireStep[] = [
         id: 'existing_investments',
         question: '¿Tiene inversiones actualmente?',
         type: 'single',
+        microLearning:
+          'Su portafolio se construirá con ETFs — fondos cotizados que combinan la diversificación de un fondo con la flexibilidad de una acción.',
         options: [
           { value: 'none', label: 'No, esta sería mi primera inversión' },
           { value: 'savings', label: 'Solo cuentas de ahorro o CDTs' },
           { value: 'some', label: 'Sí, en fondos o acciones' },
           { value: 'diversified', label: 'Sí, un portafolio diversificado' },
-        ],
-      },
-      {
-        id: 'account_type',
-        question: '¿Dónde planea invertir?',
-        type: 'single',
-        options: [
-          { value: 'brokerage', label: 'Cuenta de corretaje' },
-          { value: 'collective', label: 'Fondo de inversión colectiva' },
-          { value: 'digital', label: 'Cuenta de banco digital' },
-          { value: 'unsure', label: 'No sé aún' },
-        ],
-      },
-      {
-        id: 'initial_investment',
-        question: '¿Cuánto planea invertir inicialmente?',
-        type: 'single',
-        options: [
-          { value: 'under5m', label: 'Hasta $5.000.000' },
-          { value: '5m-25m', label: '$5.000.000 – $25.000.000' },
-          { value: '25m-100m', label: '$25.000.000 – $100.000.000' },
-          { value: 'over100m', label: '$100.000.000+' },
         ],
       },
       {
@@ -190,29 +174,6 @@ export const questionnaireSteps: QuestionnaireStep[] = [
           { value: 'moderate', label: 'Moderadamente — quiero acceso en semanas' },
           { value: 'low', label: 'Poco importante — puedo esperar meses' },
           { value: 'none', label: 'No es prioridad — es inversión de largo plazo' },
-        ],
-      },
-      {
-        id: 'sophistication',
-        question: '¿Cómo describiría su conocimiento de inversiones?',
-        type: 'single',
-        options: [
-          { value: 'beginner', label: 'Principiante — estoy empezando a aprender' },
-          { value: 'basic', label: 'Básico — conozco CDTs y fondos' },
-          { value: 'intermediate', label: 'Intermedio — entiendo ETFs y diversificación' },
-          { value: 'advanced', label: 'Avanzado — analizo mercados activamente' },
-          { value: 'expert', label: 'Experto — experiencia profesional en finanzas' },
-        ],
-      },
-      {
-        id: 'tax_efficiency',
-        question: '¿Qué tan importante es la eficiencia tributaria en sus inversiones?',
-        type: 'single',
-        options: [
-          { value: 'not_important', label: 'No es algo que considero' },
-          { value: 'somewhat', label: 'Lo considero pero no es prioridad' },
-          { value: 'important', label: 'Es un factor importante en mis decisiones' },
-          { value: 'critical', label: 'Es fundamental — optimizo activamente' },
         ],
       },
     ],
@@ -237,41 +198,6 @@ export const questionnaireSteps: QuestionnaireStep[] = [
         ],
       },
       {
-        id: 'comparison_reaction',
-        question: 'Un amigo ganó 30% este año mientras usted ganó 10%. ¿Cómo reacciona?',
-        type: 'single',
-        options: [
-          { value: 'frustrated', label: 'Frustrado — debería cambiar mi estrategia' },
-          { value: 'curious', label: 'Curioso — investigaría qué hizo diferente' },
-          { value: 'neutral', label: 'Tranquilo — cada quien tiene su estrategia' },
-          { value: 'satisfied', label: 'Satisfecho — 10% es un buen retorno' },
-        ],
-      },
-      {
-        id: 'withdrawal_expectation',
-        question: '¿Cuándo espera necesitar retirar dinero de sus inversiones?',
-        type: 'single',
-        options: [
-          { value: 'within_1y', label: 'Dentro de 1 año' },
-          { value: '1_3y', label: 'En 1-3 años' },
-          { value: '3_5y', label: 'En 3-5 años' },
-          { value: '5_10y', label: 'En 5-10 años' },
-          { value: 'over_10y', label: 'Más de 10 años' },
-        ],
-      },
-      {
-        id: 'check_frequency',
-        question: '¿Con qué frecuencia revisaría su portafolio?',
-        type: 'single',
-        options: [
-          { value: 'daily', label: 'Diariamente' },
-          { value: 'weekly', label: 'Semanalmente' },
-          { value: 'monthly', label: 'Mensualmente' },
-          { value: 'quarterly', label: 'Trimestralmente' },
-          { value: 'rarely', label: 'Casi nunca — confío en la estrategia' },
-        ],
-      },
-      {
         id: 'max_loss',
         question: '¿Cuál es la pérdida máxima que toleraría en un año antes de cambiar su estrategia?',
         type: 'single',
@@ -287,6 +213,7 @@ export const questionnaireSteps: QuestionnaireStep[] = [
   },
 
   // --- STEP 4: ESTILO ---
+  // ETF-centric: familiarity, passive vs active, currency comfort, themes.
   {
     id: 'estilo',
     title: 'Estilo',
@@ -294,47 +221,56 @@ export const questionnaireSteps: QuestionnaireStep[] = [
     hasAI: true,
     questions: [
       {
-        id: 'approach',
-        question: '¿Qué enfoque de inversión prefiere?',
+        id: 'etf_familiarity',
+        question: '¿Qué tan familiar se siente con los ETFs?',
         type: 'single',
+        microLearning:
+          'Un ETF es una canasta diversificada de cientos de inversiones que se compra y vende como una sola acción en la bolsa.',
         options: [
-          { value: 'passive', label: 'Indexado / Pasivo', description: 'Replicar el mercado con costos bajos' },
-          { value: 'active', label: 'Activo', description: 'Buscar superar al mercado con gestión profesional' },
-          { value: 'mix', label: 'Combinación', description: 'Base indexada con toques de gestión activa' },
-          { value: 'unsure', label: 'No estoy seguro', description: 'Necesito más orientación' },
+          { value: 'never_heard', label: 'Es la primera vez que escucho del término', description: 'Le explicaremos cada paso' },
+          { value: 'heard_only', label: 'He oído de ellos pero no los entiendo bien', description: 'Buena base para empezar' },
+          { value: 'understand', label: 'Entiendo cómo funcionan a grandes rasgos', description: 'Ya tiene contexto' },
+          { value: 'invested', label: 'He invertido en ETFs antes', description: 'Experiencia directa' },
         ],
       },
       {
-        id: 'concentration',
-        question: '¿Prefiere un portafolio concentrado o diversificado?',
+        id: 'passive_active_pref',
+        question: '¿Qué enfoque prefiere para construir su portafolio?',
         type: 'single',
+        microLearning:
+          'Los ETFs pasivos cobran 0,03% – 0,20% al año; los fondos activos suelen cobrar 1% – 2%. Esa diferencia compone significativamente con el tiempo.',
         options: [
-          { value: 'concentrated', label: 'Concentrado', description: 'Pocas posiciones con mayor convicción' },
-          { value: 'balanced', label: 'Balanceado', description: 'Diversificación moderada' },
-          { value: 'diversified', label: 'Muy Diversificado', description: 'Máxima diversificación global' },
+          { value: 'passive', label: 'Indexado / Pasivo', description: 'Replicar el mercado con costos muy bajos' },
+          { value: 'mix', label: 'Combinación', description: 'Base indexada con toques de gestión activa' },
+          { value: 'active', label: 'Activo', description: 'Pagar por gestión profesional que busque superar al mercado' },
+          { value: 'unsure', label: 'No estoy seguro', description: 'Quiero la recomendación de la IA' },
+        ],
+      },
+      {
+        id: 'currency_comfort',
+        question: '¿Qué tan cómodo se siente invirtiendo en ETFs denominados en dólares?',
+        type: 'single',
+        microLearning:
+          'Invertir en USD diversifica su exposición de moneda y le da acceso a los mercados globales más profundos. Le protege ante una depreciación del peso colombiano.',
+        options: [
+          { value: 'usd_only', label: 'Prefiero todo en USD / mercados globales' },
+          { value: 'usd_majority', label: 'Mayoría en USD, algo local' },
+          { value: 'balanced', label: 'Balance entre COP y USD' },
+          { value: 'cop_majority', label: 'Prefiero quedarme principalmente en COP' },
         ],
       },
       {
         id: 'themes',
         question: '¿Tiene interés en algún tema de inversión específico?',
         type: 'multi',
+        microLearning:
+          'Los ETFs temáticos le dan exposición a tendencias específicas — IA, energía limpia, dividendos — sin tener que escoger acciones individuales.',
         options: [
           { value: 'esg', label: 'ESG / Sustentabilidad', description: 'Inversiones con impacto ambiental y social' },
           { value: 'tech', label: 'Tecnología / IA', description: 'Sector tecnológico e inteligencia artificial' },
           { value: 'income', label: 'Renta con Dividendos', description: 'Flujos de ingresos regulares' },
           { value: 'international', label: 'Mercado Internacional', description: 'Diversificación fuera de Colombia' },
           { value: 'fixed-dollar', label: 'Renta Fija / Dolarización', description: 'Protección en dólares y bonos del Tesoro' },
-        ],
-      },
-      {
-        id: 'esg_importance',
-        question: '¿Qué tan importante son los criterios ESG para usted?',
-        type: 'single',
-        options: [
-          { value: 'not', label: 'No los considero' },
-          { value: 'nice', label: 'Es un plus pero no determinante' },
-          { value: 'important', label: 'Influye en mis decisiones de inversión' },
-          { value: 'critical', label: 'Es un criterio fundamental' },
         ],
       },
     ],
@@ -348,12 +284,12 @@ export interface FallbackAIQuestion {
 
 export const fallbackAIQuestions: Record<StepId, FallbackAIQuestion> = {
   objetivo: {
-    question: '¿En qué etapa describe mejor su situación financiera actual?',
+    question: '¿Qué describe mejor su disponibilidad para mantener esta inversión sin tocarla?',
     options: [
-      'Apenas empezando, con poco ahorro',
-      'Ahorrando activamente cada mes',
-      'Con patrimonio consolidado',
-      'Dependiendo de ingresos de inversiones',
+      'Necesito flexibilidad — podría retirarla pronto',
+      'La mantendría algunos años pero con la opción de retirar',
+      'La dejaría crecer durante varios años',
+      'Es de muy largo plazo — no la tocaría',
     ],
   },
   finanzas: {
@@ -375,7 +311,7 @@ export const fallbackAIQuestions: Record<StepId, FallbackAIQuestion> = {
     ],
   },
   estilo: {
-    question: '¿Qué sector global le genera más confianza para invertir?',
+    question: '¿Qué sector global le genera más confianza para invertir vía ETFs?',
     options: [
       'Tecnología e innovación',
       'Energía y recursos naturales',

@@ -10,6 +10,9 @@ import PrototypeDemo from './components/PrototypeDemo';
 import ResultsPage from './components/ResultsPage';
 import DisclaimerFooter from './components/DisclaimerFooter';
 import type { ScoringResult } from './engine/scoringEngine';
+import { AudioProvider } from './audio/AudioProvider';
+import { useAudio } from './audio/useAudio';
+import MuteToggle from './audio/MuteToggle';
 
 const CORRECT_PASSWORD = 'CO2026$';
 
@@ -17,10 +20,13 @@ function AuthGate({ onAuth }: { onAuth: () => void }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const audio = useAudio();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (password === CORRECT_PASSWORD) {
+      audio.unlock();
+      audio.playStaticVoice('welcome');
       onAuth();
     } else {
       setError(true);
@@ -100,7 +106,7 @@ function AuthGate({ onAuth }: { onAuth: () => void }) {
   );
 }
 
-export default function App() {
+function AppInner() {
   const [authenticated, setAuthenticated] = useState(false);
   const [result, setResult] = useState<ScoringResult | null>(null);
 
@@ -147,13 +153,16 @@ export default function App() {
                     Personalización Directa
                   </span>
                 </div>
-                <button
-                  onClick={handleBackToHome}
-                  className="flex items-center gap-1.5 text-sm font-medium text-co-muted hover:text-gray-900 transition-colors"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Volver al cuestionario
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handleBackToHome}
+                    className="flex items-center gap-1.5 text-sm font-medium text-co-muted hover:text-gray-900 transition-colors"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Volver al cuestionario
+                  </button>
+                  <MuteToggle />
+                </div>
               </div>
             </div>
 
@@ -183,5 +192,13 @@ export default function App() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AudioProvider>
+      <AppInner />
+    </AudioProvider>
   );
 }

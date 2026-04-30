@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import MuteToggle from '../audio/MuteToggle';
 
 const navItems = [
   { label: 'Descripción General', href: '#overview' },
@@ -64,34 +65,37 @@ export default function Header() {
           Prototipo por Samuel &amp; Claude Opus 4.6
         </span>
 
-        {/* Nav */}
-        <nav className="hidden md:flex items-center gap-1">
-          {navItems.map(({ label, href }) => {
-            const sectionId = href.replace('#', '');
-            const isActive = activeSection === sectionId;
-            return (
-              <a
-                key={href}
-                href={href}
-                onClick={(e) => handleNavClick(e, href)}
-                className={`relative px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  isActive
-                    ? 'text-co-green'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                }`}
-              >
-                {label}
-                {isActive && (
-                  <motion.div
-                    layoutId="activeNav"
-                    className="absolute bottom-0 left-3 right-3 h-0.5 bg-co-green rounded-full"
-                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                  />
-                )}
-              </a>
-            );
-          })}
-        </nav>
+        {/* Nav + audio toggle */}
+        <div className="flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-1">
+            {navItems.map(({ label, href }) => {
+              const sectionId = href.replace('#', '');
+              const isActive = activeSection === sectionId;
+              return (
+                <a
+                  key={href}
+                  href={href}
+                  onClick={(e) => handleNavClick(e, href)}
+                  className={`relative px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    isActive
+                      ? 'text-co-green'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  {label}
+                  {isActive && (
+                    <motion.div
+                      layoutId="activeNav"
+                      className="absolute bottom-0 left-3 right-3 h-0.5 bg-co-green rounded-full"
+                      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                    />
+                  )}
+                </a>
+              );
+            })}
+          </nav>
+          <MuteToggle />
+        </div>
       </div>
     </motion.header>
   );

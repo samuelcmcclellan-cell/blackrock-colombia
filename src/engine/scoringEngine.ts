@@ -97,29 +97,13 @@ function scoreFinanceStep(answers: Answers): Partial<DimensionScores> {
   }
   partial.timeHorizon = clamp(Math.round((80 - age) / 6), 1, 10);
 
-  // Existing investments → sophistication
+  // Existing investments → baseline sophistication signal
   const expMap: Record<string, number> = { none: 1, savings: 2, some: 3, diversified: 5 };
   partial.investmentSophistication = expMap[answers.existing_investments as string] || 2;
 
   // Liquidity
   const liqMap: Record<string, number> = { critical: 5, moderate: 3, low: 2, none: 1 };
   partial.liquidityNeed = liqMap[answers.liquidity as string] || 3;
-
-  // Sophistication
-  const sophMap: Record<string, number> = { beginner: 1, basic: 2, intermediate: 3, advanced: 4, expert: 5 };
-  partial.investmentSophistication = Math.max(
-    partial.investmentSophistication || 1,
-    sophMap[answers.sophistication as string] || 2
-  );
-
-  // Tax efficiency
-  const taxMap: Record<string, number> = { not_important: 0, somewhat: 1, important: 2, critical: 3 };
-  partial.taxEfficiency = taxMap[answers.tax_efficiency as string] || 0;
-
-  // Initial investment → risk tolerance nudge
-  const invMap: Record<string, number> = { under5m: -1, '5m-25m': 0, '25m-100m': 1, over100m: 2 };
-  const riskNudge = invMap[answers.initial_investment as string] || 0;
-  partial.riskTolerance = clamp(5 + riskNudge, 1, 10);
 
   return partial;
 }
@@ -131,21 +115,6 @@ function scoreRiskStep(answers: Answers): Partial<DimensionScores> {
   const ddMap: Record<string, number> = { sell_all: 1, sell_some: 3, hold: 6, buy_more: 9 };
   partial.riskTolerance = ddMap[answers.drawdown_reaction as string] || 5;
   partial.volatilityComfort = ddMap[answers.drawdown_reaction as string] ? Math.ceil(ddMap[answers.drawdown_reaction as string] / 2) : 3;
-
-  // Comparison reaction
-  const compMap: Record<string, number> = { frustrated: 2, curious: 4, neutral: 3, satisfied: 1 };
-  partial.activePreference = compMap[answers.comparison_reaction as string] || 1;
-
-  // Withdrawal expectation
-  const withMap: Record<string, number> = { within_1y: 1, '1_3y': 3, '3_5y': 5, '5_10y': 7, over_10y: 9 };
-  partial.timeHorizon = withMap[answers.withdrawal_expectation as string] || 5;
-
-  // Check frequency
-  const checkMap: Record<string, number> = { daily: 3, weekly: 2, monthly: 1, quarterly: 1, rarely: 0 };
-  partial.activePreference = Math.max(
-    partial.activePreference || 0,
-    checkMap[answers.check_frequency as string] || 1
-  );
 
   // Max loss tolerance
   const lossMap: Record<string, number> = { '5': 2, '10': 4, '20': 6, '30': 8, any: 10 };
@@ -159,23 +128,31 @@ function scoreRiskStep(answers: Answers): Partial<DimensionScores> {
 function scoreStyleStep(answers: Answers): Partial<DimensionScores> {
   const partial: Partial<DimensionScores> = {};
 
-  // Approach
-  const appMap: Record<string, number> = { passive: 0, active: 3, mix: 2, unsure: 1 };
-  partial.activePreference = appMap[answers.approach as string] || 1;
+  // ETF familiarity → investment sophistication
+  const etfMap: Record<string, number> = {
+    never_heard: 1, heard_only: 2, understand: 3, invested: 5,
+  };
+  const etfSoph = etfMap[answers.etf_familiarity as string];
+  if (etfSoph !== undefined) partial.investmentSophistication = etfSoph;
 
-  // Concentration
-  const concMap: Record<string, number> = { concentrated: 3, balanced: 1, diversified: 0 };
-  partial.concentrationPreference = concMap[answers.concentration as string] || 1;
+  // Passive vs active preference (replaces legacy `approach`)
+  const appMap: Record<string, number> = { passive: 0, mix: 2, active: 3, unsure: 1 };
+  partial.activePreference = appMap[answers.passive_active_pref as string] ?? 1;
+
+  // Currency comfort → international interest signal
+  const currMap: Record<string, number> = {
+    usd_only: 4, usd_majority: 3, balanced: 2, cop_majority: 0,
+  };
+  const currSignal = currMap[answers.currency_comfort as string];
+  if (currSignal !== undefined) partial.internationalInterest = currSignal;
 
   // Themes
   const themes = (answers.themes as string[]) || [];
   if (themes.includes('esg')) partial.esgPreference = 3;
-  if (themes.includes('international')) partial.internationalInterest = 3;
+  if (themes.includes('international')) {
+    partial.internationalInterest = Math.max(partial.internationalInterest || 0, 3);
+  }
   if (themes.includes('income')) partial.incomeNeed = clamp((partial.incomeNeed || 2) + 2, 1, 5);
-
-  // ESG importance
-  const esgMap: Record<string, number> = { not: 0, nice: 1, important: 2, critical: 3 };
-  partial.esgPreference = Math.max(partial.esgPreference || 0, esgMap[answers.esg_importance as string] || 0);
 
   return partial;
 }
