@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const KEY = process.env.ELEVENLABS_API_KEY;
-const DEFAULT_VOICE = process.env.ELEVENLABS_VOICE_ID ?? 'IKne3meq5aSn9XLyUdCD';
+const DEFAULT_VOICE = process.env.ELEVENLABS_VOICE_ID ?? '86V9x9hrQds83qf7zaGn';
 const MAX_TTS_CHARS = 500;
 const MAX_SFX_DURATION = 5;
 const MIN_SFX_DURATION = 0.5;

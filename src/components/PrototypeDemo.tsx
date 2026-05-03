@@ -5,6 +5,7 @@ import { questionnaireSteps, type StepId, type Question } from '../data/question
 import { useAIInsight } from '../hooks/useAIInsight';
 import { runScoringEngine, applyThemeOverlaysPublic, type Answers, type ScoringResult } from '../engine/scoringEngine';
 import { useAudio } from '../audio/useAudio';
+import type { StaticVoiceId } from '../audio/manifest';
 
 function SliderInput({
   question: q,
@@ -72,7 +73,8 @@ function DeliberationView({
     hasStarted.current = true;
 
     audio.playSfx('deliberation_start');
-    audio.playStaticVoice('deliberation_intro');
+    // Slight delay so the deliberation_start tone settles before the voice enters.
+    setTimeout(() => audio.playStaticVoice('deliberation_intro'), 600);
 
     const candidates = scoringResult.topCandidates.map((c) => ({
       id: c.portfolio.id,
@@ -112,7 +114,6 @@ function DeliberationView({
         // Animate steps one by one
         for (let i = 0; i < steps.length; i++) {
           await new Promise((r) => setTimeout(r, 800));
-          audio.playSfxRandom(['thinking_tick_1', 'thinking_tick_2', 'thinking_tick_3']);
           setVisibleSteps(i + 1);
         }
 
@@ -159,7 +160,6 @@ function DeliberationView({
 
         for (let i = 0; i < fallbackSteps.length; i++) {
           await new Promise((r) => setTimeout(r, 800));
-          audio.playSfxRandom(['thinking_tick_1', 'thinking_tick_2', 'thinking_tick_3']);
           setVisibleSteps(i + 1);
         }
 
@@ -292,13 +292,36 @@ export default function PrototypeDemo({
   const isLastStep = currentStepIndex >= questionnaireSteps.length - 1;
   const aiInsight = insights[currentStep.id];
 
-  // Voice cue when transitioning into a new section
+  // Wait until the questionnaire section is actually in view before voicing
+  // questions — otherwise the welcome voice (from auth) gets cut by Q1's voice
+  // before the user has scrolled down.
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const [hasEntered, setHasEntered] = useState(false);
   useEffect(() => {
-    const id = currentStep.id;
-    if (id === 'finanzas') audio.playStaticVoice('step_finanzas');
-    else if (id === 'riesgo') audio.playStaticVoice('step_riesgo');
-    else if (id === 'estilo') audio.playStaticVoice('step_estilo');
-  }, [currentStep.id, audio]);
+    const el = sectionRef.current;
+    if (!el || hasEntered) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setHasEntered(true);
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.25 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [hasEntered]);
+
+  // Voice each standard question prompt as the user reaches it. AI questions
+  // are voiced separately via streamTTS below.
+  useEffect(() => {
+    if (!hasEntered) return;
+    if (showAIQuestion) return;
+    const qid = currentQuestion?.id;
+    if (!qid) return;
+    audio.playStaticVoice(`q_${qid}` as StaticVoiceId);
+  }, [hasEntered, currentQuestion?.id, showAIQuestion, audio]);
 
   // Stream the AI-generated question aloud once it arrives.
   // The streamed question itself is the audio cue — no static "thinking" voice
@@ -380,7 +403,6 @@ export default function PrototypeDemo({
 
   const handleOptionSelect = useCallback(
     (questionId: string, value: string, isMulti: boolean) => {
-      audio.playSfxRandom(['option_select_1', 'option_select_2', 'option_select_3']);
       if (isMulti) {
         const current = (stepAnswers[questionId] as string[]) || [];
         const updated = current.includes(value)
@@ -392,16 +414,15 @@ export default function PrototypeDemo({
         setTimeout(() => goNextRef.current(), 300);
       }
     },
-    [stepAnswers, updateAnswer, audio]
+    [stepAnswers, updateAnswer]
   );
 
   const handleAIOptionSelect = useCallback(
     (opt: string) => {
-      audio.playSfxRandom(['option_select_1', 'option_select_2', 'option_select_3']);
       setAiSelectedOption((prev) => ({ ...prev, [currentStep.id]: opt }));
       setTimeout(() => goNextRef.current(opt), 300);
     },
-    [currentStep.id, audio]
+    [currentStep.id]
   );
 
   const goPrev = useCallback(() => {
@@ -439,7 +460,7 @@ export default function PrototypeDemo({
   const aiOptionSelected = !!aiSelectedOption[currentStep.id];
 
   return (
-    <section id="prototype" className="section-padding">
+    <section id="prototype" ref={sectionRef} className="section-padding">
       <div className="container-max">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -548,7 +569,6 @@ export default function PrototypeDemo({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -30 }}
               transition={{ duration: 0.3 }}
-              onAnimationStart={() => audio.playSfxRandom(['step_swoosh_1', 'step_swoosh_2'])}
               className="card p-8"
             >
               {/* Step subtitle */}

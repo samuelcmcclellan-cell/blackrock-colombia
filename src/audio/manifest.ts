@@ -1,19 +1,8 @@
 export const STATIC_VOICES = [
+  // Framing
   {
     id: 'welcome',
     text: 'Bienvenido a BlackRock Personalización Directa. Comencemos a construir su portafolio ideal.',
-  },
-  {
-    id: 'step_finanzas',
-    text: 'Ahora, hablemos de su situación financiera.',
-  },
-  {
-    id: 'step_riesgo',
-    text: 'Vamos a explorar su tolerancia al riesgo.',
-  },
-  {
-    id: 'step_estilo',
-    text: 'Por último, sus preferencias de inversión.',
   },
   {
     id: 'ai_thinking',
@@ -35,73 +24,98 @@ export const STATIC_VOICES = [
     id: 'error_generic',
     text: 'Lo sentimos, ocurrió un problema. Por favor intente nuevamente.',
   },
+
+  // Per-question voices — id matches `q_<question.id>` so PrototypeDemo can
+  // resolve the voice automatically when currentQuestion changes.
+  {
+    id: 'q_goal',
+    text: '¿Cuál es su principal motivación para invertir?',
+  },
+  {
+    id: 'q_retirement_years',
+    text: '¿Cuántos años faltan para su jubilación?',
+  },
+  {
+    id: 'q_education_years',
+    text: '¿En cuántos años necesitará los fondos para educación?',
+  },
+  {
+    id: 'q_purchase_timeline',
+    text: '¿En cuántos años planea realizar esta compra?',
+  },
+  {
+    id: 'q_growth_horizon',
+    text: '¿Cuál es su horizonte de inversión para crecimiento?',
+  },
+  {
+    id: 'q_income_frequency',
+    text: '¿Con qué frecuencia necesita recibir ingresos?',
+  },
+  {
+    id: 'q_emergency_months',
+    text: '¿Cuántos meses de gastos quiere cubrir con su reserva?',
+  },
+  {
+    id: 'q_age',
+    text: '¿En qué etapa de vida se encuentra?',
+  },
+  {
+    id: 'q_existing_investments',
+    text: '¿Tiene inversiones actualmente?',
+  },
+  {
+    id: 'q_liquidity',
+    text: '¿Qué tan importante es poder retirar su dinero rápidamente?',
+  },
+  {
+    id: 'q_drawdown_reaction',
+    text: 'Si su portafolio cayera un veinte por ciento en un mes, ¿qué haría?',
+  },
+  {
+    id: 'q_max_loss',
+    text: '¿Cuál es la pérdida máxima que toleraría en un año antes de cambiar su estrategia?',
+  },
+  {
+    id: 'q_etf_familiarity',
+    text: '¿Qué tan familiar se siente con los ETFs?',
+  },
+  {
+    id: 'q_passive_active_pref',
+    text: '¿Qué enfoque prefiere para construir su portafolio?',
+  },
+  {
+    id: 'q_currency_comfort',
+    text: '¿Qué tan cómodo se siente invirtiendo en ETFs denominados en dólares?',
+  },
+  {
+    id: 'q_themes',
+    text: '¿Tiene interés en algún tema de inversión específico?',
+  },
 ] as const;
 
+// Sparse SFX: only the three dramatic moments. Click / transition sounds were
+// dropped — visual feedback (button highlight, motion animation) is sufficient
+// and the previous SFX felt mechanical at the rate they were firing.
+// Prompts use real musical-instrument language because ElevenLabs sound
+// generation renders those more cleanly than abstract "chime / whoosh" prompts.
 export const SFX_LIBRARY = [
-  // Variants for repeated cues — rotated to keep the soundscape organic.
-  {
-    id: 'option_select_1',
-    prompt:
-      'warm hardwood mallet softly tapping a small bronze bell, single delicate note, very brief, library quiet, gentle decay, no reverb',
-    duration: 0.6,
-  },
-  {
-    id: 'option_select_2',
-    prompt:
-      'soft glass orb tap, single short pure tone around 700Hz, gentle and intimate, no reverb, premium minimal',
-    duration: 0.6,
-  },
-  {
-    id: 'option_select_3',
-    prompt:
-      'low ceramic chime, single warm muted tone with quick fade, subtle and refined financial app confirmation',
-    duration: 0.6,
-  },
-  {
-    id: 'step_swoosh_1',
-    prompt:
-      'barely-there paper turn, very soft cloth swish, gentle and warm, sub-second, calm transition',
-    duration: 0.6,
-  },
-  {
-    id: 'step_swoosh_2',
-    prompt:
-      'subtle breath of air, soft whisper of motion, calm and ambient, brief, no impact',
-    duration: 0.6,
-  },
-  {
-    id: 'thinking_tick_1',
-    prompt: 'dampened wood tap, very soft single click, sub-second, organic and quiet',
-    duration: 0.5,
-  },
-  {
-    id: 'thinking_tick_2',
-    prompt: 'quiet pencil dot on paper, soft brief click, intimate and subtle',
-    duration: 0.5,
-  },
-  {
-    id: 'thinking_tick_3',
-    prompt: 'muffled finger tap on felt, single soft thud, gentle and minimal',
-    duration: 0.5,
-  },
-  // Singletons for one-shot moments — rewritten softer.
   {
     id: 'deliberation_start',
     prompt:
-      'warm contemplative ambient drone, low-volume sustained pad, calm and meditative, no melody, no rhythm, gentle entry',
+      'single soft piano note held in the low-mid register, warm sustained tone, gentle and contemplative, slow attack, no rhythm, no melody',
     duration: 1.5,
   },
   {
     id: 'portfolio_reveal',
     prompt:
-      'soft warm chord, two gentle ascending notes on glass marimba, peaceful and reassuring, brief and understated, no fanfare',
+      'two soft piano notes ascending a major third, warm and peaceful resolution, brief and understated, no decay artifacts, no fanfare',
     duration: 1.5,
   },
   {
     id: 'results_celebrate',
     prompt:
-      'single bright but gentle bronze bell, soft warm tone with calm decay, intimate celebration, very brief and tasteful',
-    duration: 1.2,
+      'single warm glockenspiel note, soft bright tone with gentle decay, intimate and tasteful, very brief',
+    duration: 1.0,
   },
 ] as const;
 
