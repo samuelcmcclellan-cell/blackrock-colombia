@@ -72,21 +72,28 @@ export default function ResultsPage({
   }, [portfolio]);
 
   const radarData = useMemo(() => {
-    const labels: Record<string, string> = {
-      riskTolerance: 'Riesgo',
-      timeHorizon: 'Horizonte',
-      incomeNeed: 'Renta',
-      esgPreference: 'ESG',
-      internationalInterest: 'Internacional',
-      liquidityNeed: 'Liquidez',
-      investmentSophistication: 'Sofisticación',
-      volatilityComfort: 'Volatilidad',
-    };
-    return Object.entries(labels).map(([key, label]) => ({
-      dimension: label,
-      value: Math.round(((finalScores as unknown as Record<string, number>)[key] || 0) * 10) / 10,
-      fullMark: 10,
-    }));
+    // Each dimension's documented max from DimensionScores in portfolios.ts.
+    // We project everything onto a 0–10 display scale so all petals are
+    // visually comparable. Order is high-impact → situational → style.
+    const dimensions: { key: keyof typeof finalScores; label: string; max: number }[] = [
+      { key: 'riskTolerance',            label: 'Riesgo',        max: 10 },
+      { key: 'timeHorizon',              label: 'Horizonte',     max: 10 },
+      { key: 'volatilityComfort',        label: 'Volatilidad',   max: 5  },
+      { key: 'liquidityNeed',            label: 'Liquidez',      max: 5  },
+      { key: 'investmentSophistication', label: 'Sofisticación', max: 5  },
+      { key: 'incomeNeed',               label: 'Renta',         max: 5  },
+      { key: 'internationalInterest',    label: 'Internacional', max: 3  },
+      { key: 'activePreference',         label: 'Activo',        max: 3  },
+    ];
+    return dimensions.map(({ key, label, max }) => {
+      const raw = (finalScores as unknown as Record<string, number>)[key] || 0;
+      const normalized = Math.min(10, Math.max(0, (raw / max) * 10));
+      return {
+        dimension: label,
+        value: Math.round(normalized * 10) / 10,
+        fullMark: 10,
+      };
+    });
   }, [finalScores]);
 
   const riskBadge = getRiskBadge(portfolio.riskLevel);

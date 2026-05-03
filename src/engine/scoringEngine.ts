@@ -10,7 +10,10 @@ export interface AIModifier {
   confidenceLevel?: number;
 }
 
-const dimensionWeights: Record<keyof DimensionScores, number> = {
+// Only dimensions the questionnaire actually measures. Including unmeasured
+// ones (taxEfficiency, concentrationPreference) here would silently bias
+// matching toward portfolios whose values are close to their default `1`.
+const dimensionWeights: Partial<Record<keyof DimensionScores, number>> = {
   riskTolerance: 3.0,
   timeHorizon: 2.5,
   incomeNeed: 1.5,
@@ -19,9 +22,7 @@ const dimensionWeights: Record<keyof DimensionScores, number> = {
   activePreference: 0.8,
   liquidityNeed: 1.5,
   investmentSophistication: 1.0,
-  taxEfficiency: 0.5,
   volatilityComfort: 2.0,
-  concentrationPreference: 0.8,
 };
 
 function clamp(val: number, min: number, max: number): number {
@@ -116,10 +117,15 @@ function scoreRiskStep(answers: Answers): Partial<DimensionScores> {
   partial.riskTolerance = ddMap[answers.drawdown_reaction as string] || 5;
   partial.volatilityComfort = ddMap[answers.drawdown_reaction as string] ? Math.ceil(ddMap[answers.drawdown_reaction as string] / 2) : 3;
 
-  // Max loss tolerance
+  // Max loss tolerance — clamp to [1, 5] to match the documented range
+  // (DimensionScores.volatilityComfort: 1-5) and applyAIModifiers' clamp.
   const lossMap: Record<string, number> = { '5': 2, '10': 4, '20': 6, '30': 8, any: 10 };
-  partial.volatilityComfort = Math.round(
-    ((partial.volatilityComfort || 3) + (lossMap[answers.max_loss as string] || 3) / 2) / 1.5
+  partial.volatilityComfort = clamp(
+    Math.round(
+      ((partial.volatilityComfort || 3) + (lossMap[answers.max_loss as string] || 3) / 2) / 1.5
+    ),
+    1,
+    5
   );
 
   return partial;
@@ -226,7 +232,7 @@ function applyAIModifiers(scores: DimensionScores, modifiers: AIModifier[]): Dim
 function weightedEuclideanDistance(a: DimensionScores, b: DimensionScores): number {
   let sumSq = 0;
   for (const key of Object.keys(dimensionWeights) as (keyof DimensionScores)[]) {
-    const weight = dimensionWeights[key];
+    const weight = dimensionWeights[key] ?? 0;
     const diff = (a[key] || 0) - (b[key] || 0);
     sumSq += weight * diff * diff;
   }
