@@ -123,6 +123,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     const el = voiceElRef.current;
     if (!el) return;
     try {
+      // Cut any in-flight TTS narration so two voices never overlap.
+      // Symmetric with streamTTS pausing voiceElRef before playing.
+      ttsElRef.current?.pause();
       el.pause();
       el.src = voiceUrl(id);
       el.currentTime = 0;

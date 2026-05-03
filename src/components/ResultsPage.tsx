@@ -35,8 +35,11 @@ export default function ResultsPage({
 
   useEffect(() => {
     audio.playSfx('results_celebrate');
-    const t = setTimeout(() => audio.playStaticVoice('results_title'), 800);
-    return () => clearTimeout(t);
+    // results_title voice intentionally NOT played here: the AI deliberation
+    // reasoning is the climax narration and runs ~5–10 s. Playing
+    // 'Su portafolio recomendado' on top of it (or cutting it short) was the
+    // overlap the user reported on the reveal moment. The page header
+    // already says it visually; the celebration SFX is the audio cue.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
