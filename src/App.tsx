@@ -131,66 +131,58 @@ function AppInner() {
     return <AuthGate onAuth={handleAuth} />;
   }
 
+  // NOTE: deliberately NOT wrapped in AnimatePresence. The home/results swap
+  // is a hard page switch, and the previous AnimatePresence with mode="wait"
+  // would deadlock here: the home <motion.div> began its exit (opacity → 0)
+  // but the nested AnimatePresence inside PrototypeDemo prevented the parent
+  // exit from ever signaling complete, so the results branch never mounted.
+  // Symptom: a blank screen after deliberation finishes.
   return (
     <div className="min-h-screen bg-co-bg">
-      <AnimatePresence mode="wait">
-        {result ? (
-          <motion.div
-            key="results"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            {/* Minimal results header */}
-            <div className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100">
-              <div className="container-max flex items-center justify-between h-16 sm:h-20 px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center gap-3">
-                  <span className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900">
-                    BlackRock
-                  </span>
-                  <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-co-green text-white">
-                    Personalización Directa
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={handleBackToHome}
-                    className="flex items-center gap-1.5 text-sm font-medium text-co-muted hover:text-gray-900 transition-colors"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    Volver al cuestionario
-                  </button>
-                  <MuteToggle />
-                </div>
+      {result ? (
+        <>
+          {/* Minimal results header */}
+          <div className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100">
+            <div className="container-max flex items-center justify-between h-16 sm:h-20 px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center gap-3">
+                <span className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900">
+                  BlackRock
+                </span>
+                <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-co-green text-white">
+                  Personalización Directa
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={handleBackToHome}
+                  className="flex items-center gap-1.5 text-sm font-medium text-co-muted hover:text-gray-900 transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Volver al cuestionario
+                </button>
+                <MuteToggle />
               </div>
             </div>
+          </div>
 
-            <main className="pt-20">
-              <ResultsPage result={result} onRestart={handleBackToHome} />
-            </main>
-            <DisclaimerFooter />
-          </motion.div>
-        ) : (
-          <motion.div
-            key="home"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <Header />
-            <main>
-              <HeroSection />
-              <OpportunitySection />
-              <HowItWorks />
-              <OperatingModels />
-              <PrototypeDemo onResult={handleResult} />
-            </main>
-            <DisclaimerFooter />
-          </motion.div>
-        )}
-      </AnimatePresence>
+          <main className="pt-20">
+            <ResultsPage result={result} onRestart={handleBackToHome} />
+          </main>
+          <DisclaimerFooter />
+        </>
+      ) : (
+        <>
+          <Header />
+          <main>
+            <HeroSection />
+            <OpportunitySection />
+            <HowItWorks />
+            <OperatingModels />
+            <PrototypeDemo onResult={handleResult} />
+          </main>
+          <DisclaimerFooter />
+        </>
+      )}
     </div>
   );
 }
